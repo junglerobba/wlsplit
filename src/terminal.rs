@@ -7,7 +7,7 @@ use livesplit_core::TimeSpan;
 use std::io::{stdout, Write};
 use std::{convert::TryInto, error::Error};
 
-use crate::{event, wl_split_timer::WlSplitTimer};
+use crate::{event, wl_split_timer::WlSplitTimer, TimerDisplay};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -29,8 +29,10 @@ impl App {
     pub fn new(timer: WlSplitTimer) -> Result<Self, Box<dyn Error>> {
         Ok(Self { timer })
     }
+}
 
-    pub fn run(mut self) -> Result<(), Box<dyn Error>> {
+impl TimerDisplay for App {
+    fn run(&mut self) -> Result<(), Box<dyn Error>> {
         let mut stdout = stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         enable_raw_mode()?;
@@ -170,6 +172,10 @@ impl App {
             })?;
         }
         Ok(())
+    }
+
+    fn split(&mut self) {
+        self.timer.split();
     }
 }
 
