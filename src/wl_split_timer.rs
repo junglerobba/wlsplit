@@ -135,6 +135,14 @@ impl WlSplitTimer {
 
         time
     }
+
+    pub fn string_to_time(string: String) -> Time {
+        let time = WlSplitTimer::parse_time_string(string) as f64;
+        let time_span = TimeSpan::from_milliseconds(time);
+
+        let mut time: Time = Time::new();
+        time.with_real_time(Some(time_span))
+    }
 }
 
 fn pad_zeroes(time: u128, length: usize) -> String {
@@ -156,25 +164,22 @@ fn read_file(file: &String, run: &mut Run) {
         for segment in _run.Segments.Segment {
             let mut _segment = Segment::new(segment.Name);
             if let Some(real_time) = segment.BestSegmentTime.RealTime {
-                let time = WlSplitTimer::parse_time_string(real_time) as f64;
-                let time_span = TimeSpan::from_milliseconds(time);
-
-                let mut time: Time = Time::new();
-                time = time.with_real_time(Some(time_span));
-
-                _segment.set_best_segment_time(time);
+                _segment.set_best_segment_time(WlSplitTimer::string_to_time(real_time));
             }
 
             for split in segment.SplitTimes.SplitTime {
                 if let (Some(time), Some(name)) = (split.RealTime, split.name) {
                     if name == "Personal Best" {
-                        let _time = WlSplitTimer::parse_time_string(time) as f64;
-                        let time_span = TimeSpan::from_milliseconds(_time);
-                        let mut time = Time::new();
-                        time = time.with_real_time(Some(time_span));
-
-                        _segment.set_personal_best_split_time(time);
+                        _segment.set_personal_best_split_time(WlSplitTimer::string_to_time(time));
                     }
+                }
+            }
+
+            for i in 0..segment.SegmentHistory.len() {
+                if let Some(time) = &segment.SegmentHistory[i].RealTime {
+                    _segment
+                        .segment_history_mut()
+                        .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));
                 }
             }
 
