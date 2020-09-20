@@ -7,7 +7,7 @@ use livesplit_core::TimeSpan;
 use std::io::{stdout, Write};
 use std::{convert::TryInto, error::Error};
 
-use crate::{event, wl_split_timer::WlSplitTimer, TimerDisplay};
+use crate::{event, wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -20,6 +20,13 @@ use tui::{
 };
 
 const TICKRATE: u64 = 10;
+
+const TIMEFORMAT: TimeFormat = TimeFormat {
+    hours: 2,
+    minutes: 2,
+    seconds: 2,
+    msecs: 3,
+};
 
 pub struct App {
     timer: WlSplitTimer,
@@ -107,12 +114,14 @@ impl TimerDisplay for App {
                         {
                             row.push(WlSplitTimer::format_time(
                                 time.to_duration().num_milliseconds().try_into().unwrap(),
+                                TIMEFORMAT,
                                 false,
                             ));
                         } else if i == index {
                             if let Some(time) = self.timer.time() {
                                 row.push(WlSplitTimer::format_time(
                                     time.to_duration().num_milliseconds().try_into().unwrap(),
+                                    TIMEFORMAT,
                                     false,
                                 ));
                             }
@@ -120,6 +129,7 @@ impl TimerDisplay for App {
                             if let Some(time) = self.timer.segments()[i].split_time().real_time {
                                 row.push(WlSplitTimer::format_time(
                                     time.to_duration().num_milliseconds().try_into().unwrap(),
+                                    TIMEFORMAT,
                                     false,
                                 ));
                             }
@@ -136,6 +146,7 @@ impl TimerDisplay for App {
                         row.push("".to_string());
                         row.push(WlSplitTimer::format_time(
                             time.to_duration().num_milliseconds().try_into().unwrap(),
+                            TIMEFORMAT,
                             false,
                         ));
                         rows.push(row);
@@ -192,7 +203,7 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>, row: &mut Vec<Strin
             negative = false;
             diff = time - best;
         }
-        row.push(WlSplitTimer::format_time(diff, negative));
+        row.push(WlSplitTimer::format_time(diff, TIMEFORMAT, negative));
     } else {
         row.push("".to_string());
     }

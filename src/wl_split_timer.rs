@@ -9,6 +9,24 @@ pub struct WlSplitTimer {
     file: String,
 }
 
+pub struct TimeFormat {
+    pub hours: usize,
+    pub minutes: usize,
+    pub seconds: usize,
+    pub msecs: usize,
+}
+
+impl Default for TimeFormat {
+    fn default() -> Self {
+        Self {
+            hours: 2,
+            minutes: 2,
+            seconds: 2,
+            msecs: 3,
+        }
+    }
+}
+
 impl WlSplitTimer {
     pub fn new(file: String) -> Self {
         let mut run = Run::new();
@@ -86,7 +104,7 @@ impl WlSplitTimer {
         self.timer.run().segment(index).best_segment_time()
     }
 
-    pub fn format_time(time: u128, negative: bool) -> String {
+    pub fn format_time(time: u128, format: TimeFormat, negative: bool) -> String {
         let prefix = if negative { "-" } else { "" };
         let mut time = time;
         let hours = time / MSEC_HOUR;
@@ -99,10 +117,10 @@ impl WlSplitTimer {
         format!(
             "{}{}:{}:{}.{}",
             prefix,
-            pad_zeroes(hours, 1),
-            pad_zeroes(minutes, 2),
-            pad_zeroes(seconds, 2),
-            pad_zeroes(time, 3),
+            pad_zeroes(hours, format.hours),
+            pad_zeroes(minutes, format.minutes),
+            pad_zeroes(seconds, format.seconds),
+            pad_zeroes(time, format.msecs),
         )
     }
 }
