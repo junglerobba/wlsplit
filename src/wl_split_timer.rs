@@ -65,9 +65,9 @@ impl WlSplitTimer {
         self.timer.split();
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, update_splits: bool) {
         let paused = self.timer.current_phase() == TimerPhase::Paused;
-        self.timer.reset(true);
+        self.timer.reset(update_splits);
         self.timer.start();
         if paused {
             self.timer.pause();

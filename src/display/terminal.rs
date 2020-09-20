@@ -63,7 +63,10 @@ impl TimerDisplay for App {
                         self.timer.split();
                     }
                     if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE) {
-                        self.timer.reset();
+                        self.timer.reset(true);
+                    }
+                    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL) {
+                        self.timer.reset(false);
                     }
                     if key == KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE) {
                         self.timer.pause();
