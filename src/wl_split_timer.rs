@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::file::{self, read};
+use crate::file::{self, read, Run as RunXML};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
@@ -148,7 +148,7 @@ fn pad_zeroes(time: u128, length: usize) -> String {
 }
 
 fn read_file(file: &String, run: &mut Run) {
-    if let Ok(_run) = file::read(file) {
+    if let Ok(_run) = file::read::<RunXML>(file) {
         run.set_game_name(_run.GameName);
         run.set_category_name(_run.CategoryName);
         run.set_attempt_count(_run.AttemptCount.try_into().unwrap());

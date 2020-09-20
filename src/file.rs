@@ -1,7 +1,7 @@
 use std::{error::Error, fs::File, io::Read};
 
 use quick_xml::de::{from_str, DeError};
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Run {
@@ -50,17 +50,17 @@ pub struct Segment {
     pub SegmentHistory: Vec<SplitTime>,
 }
 
-pub fn read(file: &String) -> Result<Run, Box<dyn Error>> {
+pub fn read<T: DeserializeOwned>(file: &String) -> Result<T, Box<dyn Error>> {
     let mut file = File::open(file)?;
     let mut content = String::new();
     if let Err(_) = file.read_to_string(&mut content) {
         panic!("Unable to parse file");
     }
 
-    let run: Run;
+    let result: T;
     match from_str(&content) {
-        Ok(_run) => {
-            run = _run;
+        Ok(content) => {
+            result = content;
         }
         Err(err) => {
             println!("{}", err);
@@ -68,5 +68,5 @@ pub fn read(file: &String) -> Result<Run, Box<dyn Error>> {
         }
     }
 
-    Ok(run)
+    Ok(result)
 }
