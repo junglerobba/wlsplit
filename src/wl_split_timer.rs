@@ -1,3 +1,6 @@
+use std::convert::TryInto;
+
+use crate::file::{self, read};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
@@ -30,17 +33,8 @@ impl Default for TimeFormat {
 impl WlSplitTimer {
     pub fn new(file: String) -> Self {
         let mut run = Run::new();
-        let game_name = "test".to_string();
-        let category_name = "any%".to_string();
-        let mut segments: Vec<Segment> = Vec::new();
-        segments.push(Segment::new("seg 01"));
-        segments.push(Segment::new("seg 02"));
-        run.set_game_name(&game_name);
-        run.set_category_name(&category_name);
 
-        for segment in segments {
-            run.push_segment(segment);
-        }
+        read_file(&file, &mut run);
 
         let mut timer = Timer::new(run).expect("At least one segment expected");
 
@@ -123,6 +117,24 @@ impl WlSplitTimer {
             pad_zeroes(time, format.msecs),
         )
     }
+
+    pub fn parse_time_string(time: String) -> u128 {
+        let split = time.split(":");
+        let mut time: u128 = 0;
+        let vec: Vec<&str> = split.collect();
+
+        time = time + (MSEC_HOUR * vec[0].parse::<u128>().unwrap());
+        time = time + (MSEC_MINUTE * vec[1].parse::<u128>().unwrap());
+
+        let split = vec[2].split(".");
+        let vec: Vec<&str> = split.collect();
+
+        time = time + (MSEC_SECOND * vec[0].parse::<u128>().unwrap());
+        let msecs: String = vec[1].chars().take(3).collect();
+        time = time + msecs.parse::<u128>().unwrap();
+
+        time
+    }
 }
 
 fn pad_zeroes(time: u128, length: usize) -> String {
@@ -133,4 +145,40 @@ fn pad_zeroes(time: u128, length: usize) -> String {
     let count = length - str_length;
     let zeroes = "0".repeat(count);
     format!("{}{}", zeroes, time)
+}
+
+fn read_file(file: &String, run: &mut Run) {
+    if let Ok(_run) = file::read(file) {
+        run.set_game_name(_run.GameName);
+        run.set_category_name(_run.CategoryName);
+        run.set_attempt_count(_run.AttemptCount.try_into().unwrap());
+
+        for segment in _run.Segments.Segment {
+            let mut _segment = Segment::new(segment.Name);
+            if let Some(real_time) = segment.BestSegmentTime.RealTime {
+                let time = WlSplitTimer::parse_time_string(real_time) as f64;
+                let time_span = TimeSpan::from_milliseconds(time);
+
+                let mut time: Time = Time::new();
+                time = time.with_real_time(Some(time_span));
+
+                _segment.set_best_segment_time(time);
+            }
+
+            for split in segment.SplitTimes.SplitTime {
+                if let (Some(time), Some(name)) = (split.RealTime, split.name) {
+                    if name == "Personal Best" {
+                        let _time = WlSplitTimer::parse_time_string(time) as f64;
+                        let time_span = TimeSpan::from_milliseconds(_time);
+                        let mut time = Time::new();
+                        time = time.with_real_time(Some(time_span));
+
+                        _segment.set_personal_best_split_time(time);
+                    }
+                }
+            }
+
+            run.push_segment(_segment);
+        }
+    }
 }

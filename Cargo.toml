@@ -13,3 +13,5 @@ termion = "*"
 tui = { version = "0.10.0", features = ["crossterm"], default-features = false }
 rand = "*"
 crossterm = "*"
+serde = { version = "*", features = ["derive"] }
+quick-xml = { version = "0.17", features = ["serialize"] }
