@@ -98,6 +98,16 @@ impl WlSplitTimer {
         self.timer.run().segment(index).best_segment_time()
     }
 
+    pub fn sum_of_best_segments(&self) -> usize {
+        let mut sum: usize = 0;
+        for segment in self.timer.run().segments() {
+            if let Some(time) = segment.best_segment_time().real_time {
+                sum = sum + (time.total_milliseconds() as usize);
+            }
+        }
+        sum
+    }
+
     pub fn format_time(time: u128, format: TimeFormat, negative: bool) -> String {
         let prefix = if negative { "-" } else { "" };
         let mut time = time;

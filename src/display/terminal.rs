@@ -154,6 +154,16 @@ impl TimerDisplay for App {
                         ));
                         rows.push(row);
                     }
+
+                    let mut row = Vec::new();
+                    row.push("".to_string());
+                    row.push("Sum of best segments".to_string());
+                    row.push(WlSplitTimer::format_time(
+                        self.timer.sum_of_best_segments() as u128,
+                        TIMEFORMAT,
+                        false,
+                    ));
+                    rows.push(row);
                 }
             }
 
