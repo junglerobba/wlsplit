@@ -164,6 +164,16 @@ impl TimerDisplay for App {
                         false,
                     ));
                     rows.push(row);
+
+                    let mut row = Vec::new();
+                    row.push("".to_string());
+                    row.push("Best possible time".to_string());
+                    row.push(WlSplitTimer::format_time(
+                        self.timer.best_possible_time() as u128,
+                        TIMEFORMAT,
+                        false,
+                    ));
+                    rows.push(row);
                 }
             }
 
