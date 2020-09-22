@@ -41,15 +41,15 @@ impl WlSplitTimer {
         Self { timer, file }
     }
 
-    pub fn run(&mut self) -> &Run {
+    pub fn run(&self) -> &Run {
         self.timer.run()
     }
 
-    pub fn game_name(&mut self) -> &str {
+    pub fn game_name(&self) -> &str {
         self.timer.run().game_name()
     }
 
-    pub fn category_name(&mut self) -> &str {
+    pub fn category_name(&self) -> &str {
         self.timer.run().category_name()
     }
 
@@ -74,27 +74,27 @@ impl WlSplitTimer {
         }
     }
 
-    pub fn time(&mut self) -> Option<TimeSpan> {
+    pub fn time(&self) -> Option<TimeSpan> {
         self.timer.current_time().real_time
     }
 
-    pub fn segments(&mut self) -> &[Segment] {
+    pub fn segments(&self) -> &[Segment] {
         self.timer.run().segments()
     }
 
-    pub fn current_segment(&mut self) -> Option<&Segment> {
+    pub fn current_segment(&self) -> Option<&Segment> {
         self.timer.current_split()
     }
 
-    pub fn current_segment_index(&mut self) -> Option<usize> {
+    pub fn current_segment_index(&self) -> Option<usize> {
         self.timer.current_split_index()
     }
 
-    pub fn segment_time(&mut self, index: usize) -> Time {
+    pub fn segment_time(&self, index: usize) -> Time {
         self.timer.run().segment(index).split_time()
     }
 
-    pub fn segment_best_time(&mut self, index: usize) -> Time {
+    pub fn segment_best_time(&self, index: usize) -> Time {
         self.timer.run().segment(index).best_segment_time()
     }
 
