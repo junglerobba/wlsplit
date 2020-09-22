@@ -34,7 +34,7 @@ impl WlSplitTimer {
     pub fn new(file: String) -> Self {
         let mut run = Run::new();
 
-        read_file(&file, &mut run);
+        read_file(&file, &mut run).expect("Unable to parse file");
 
         let mut timer = Timer::new(run).expect("At least one segment expected");
 
@@ -165,35 +165,43 @@ fn pad_zeroes(time: u128, length: usize) -> String {
     format!("{}{}", zeroes, time)
 }
 
-fn read_file(file: &String, run: &mut Run) {
-    if let Ok(_run) = file::read::<RunXML>(file) {
-        run.set_game_name(_run.GameName);
-        run.set_category_name(_run.CategoryName);
-        run.set_attempt_count(_run.AttemptCount.try_into().unwrap());
+fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
+    match file::read::<RunXML>(file) {
+        Ok(_run) => {
+            run.set_game_name(_run.GameName);
+            run.set_category_name(_run.CategoryName);
+            run.set_attempt_count(_run.AttemptCount.try_into().unwrap());
 
-        for segment in _run.Segments.Segment {
-            let mut _segment = Segment::new(segment.Name);
-            if let Some(real_time) = segment.BestSegmentTime.RealTime {
-                _segment.set_best_segment_time(WlSplitTimer::string_to_time(real_time));
-            }
+            for segment in _run.Segments.Segment {
+                let mut _segment = Segment::new(segment.Name);
+                if let Some(real_time) = segment.BestSegmentTime.RealTime {
+                    _segment.set_best_segment_time(WlSplitTimer::string_to_time(real_time));
+                }
 
-            for split in segment.SplitTimes.SplitTime {
-                if let (Some(time), Some(name)) = (split.RealTime, split.name) {
-                    if name == "Personal Best" {
-                        _segment.set_personal_best_split_time(WlSplitTimer::string_to_time(time));
+                for split in segment.SplitTimes.SplitTime {
+                    if let (Some(time), Some(name)) = (split.RealTime, split.name) {
+                        if name == "Personal Best" {
+                            _segment
+                                .set_personal_best_split_time(WlSplitTimer::string_to_time(time));
+                        }
                     }
                 }
-            }
 
-            for i in 0..segment.SegmentHistory.len() {
-                if let Some(time) = &segment.SegmentHistory[i].RealTime {
-                    _segment
-                        .segment_history_mut()
-                        .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));
+                for i in 0..segment.SegmentHistory.len() {
+                    if let Some(time) = &segment.SegmentHistory[i].RealTime {
+                        _segment
+                            .segment_history_mut()
+                            .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));
+                    }
                 }
-            }
 
-            run.push_segment(_segment);
+                run.push_segment(_segment);
+            }
+        }
+        Err(_) => {
+            return Err(());
         }
     }
+
+    Ok(())
 }

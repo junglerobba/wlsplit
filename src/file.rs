@@ -50,23 +50,25 @@ pub struct Segment {
     pub SegmentHistory: Vec<SplitTime>,
 }
 
-pub fn read<T: DeserializeOwned>(file: &String) -> Result<T, Box<dyn Error>> {
-    let mut file = File::open(file)?;
+pub fn read<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(_) => {
+            return Err(());
+        }
+    };
     let mut content = String::new();
     if let Err(_) = file.read_to_string(&mut content) {
-        panic!("Unable to parse file");
+        return Err(());
     }
 
-    let result: T;
-    match from_str(&content) {
-        Ok(content) => {
-            result = content;
-        }
+    let result: T = match from_str(&content) {
+        Ok(content) => content,
         Err(err) => {
             println!("{}", err);
-            panic!("Unable to parse file");
+            return Err(());
         }
-    }
+    };
 
     Ok(result)
 }
