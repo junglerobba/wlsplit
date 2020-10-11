@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::file::{self, read, Run as RunXML};
+use crate::file::{self, read, Run as RunFile};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
@@ -192,20 +192,20 @@ fn pad_zeroes(time: u128, length: usize) -> String {
 }
 
 fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
-    match file::read::<RunXML>(file) {
+    match file::read::<RunFile>(file) {
         Ok(_run) => {
-            run.set_game_name(_run.GameName);
-            run.set_category_name(_run.CategoryName);
-            run.set_attempt_count(_run.AttemptCount.try_into().unwrap());
+            run.set_game_name(_run.game_name);
+            run.set_category_name(_run.category_name);
+            run.set_attempt_count(_run.attempt_count.try_into().unwrap());
 
-            for segment in _run.Segments.Segment {
-                let mut _segment = Segment::new(segment.Name);
-                if let Some(real_time) = segment.BestSegmentTime.RealTime {
+            for segment in _run.segments {
+                let mut _segment = Segment::new(segment.name);
+                if let Some(real_time) = segment.best_segment_time.time {
                     _segment.set_best_segment_time(WlSplitTimer::string_to_time(real_time));
                 }
 
-                for split in segment.SplitTimes.SplitTime {
-                    if let (Some(time), Some(name)) = (split.RealTime, split.name) {
+                for split in segment.split_times {
+                    if let (Some(time), Some(name)) = (split.time, split.name) {
                         if name == "Personal Best" {
                             _segment
                                 .set_personal_best_split_time(WlSplitTimer::string_to_time(time));
@@ -213,8 +213,8 @@ fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
                     }
                 }
 
-                for i in 0..segment.SegmentHistory.len() {
-                    if let Some(time) = &segment.SegmentHistory[i].RealTime {
+                for i in 0..segment.segment_history.len() {
+                    if let Some(time) = &segment.segment_history[i].time {
                         _segment
                             .segment_history_mut()
                             .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));
