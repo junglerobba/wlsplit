@@ -63,15 +63,18 @@ impl WlSplitTimer {
 
     pub fn split(&mut self) {
         self.timer.split();
+        let end_of_run = self.timer.current_phase() == TimerPhase::Ended;
+
+        if end_of_run {
+            self.reset(true);
+            write_file(&self.file, &self.timer.run());
+        }
     }
 
     pub fn reset(&mut self, update_splits: bool) {
-        let paused = self.timer.current_phase() == TimerPhase::Paused;
         self.timer.reset(update_splits);
         self.timer.start();
-        if paused {
-            self.timer.pause();
-        }
+        self.timer.pause();
     }
 
     pub fn time(&self) -> Option<TimeSpan> {
@@ -230,4 +233,9 @@ fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
     }
 
     Ok(())
+}
+
+fn write_file(file: &String, run: &Run) {
+    let run = RunFile::new(&run);
+    file::write(file, run);
 }

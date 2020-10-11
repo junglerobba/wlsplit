@@ -142,3 +142,12 @@ pub fn read<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
 
     Ok(result)
 }
+
+pub fn write(path: &String, run: Run) -> Result<(), Box<dyn Error>> {
+    let serialized = serde_json::to_string_pretty(&run)?;
+    let path = format!("{}", path);
+    let mut file = File::create(path)?;
+    file.write_all(serialized.as_bytes())?;
+
+    Ok(())
+}
