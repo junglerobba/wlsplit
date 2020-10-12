@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, error::Error};
 
 use crate::file::{self, read, Run as RunFile};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
@@ -235,7 +235,7 @@ fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
     Ok(())
 }
 
-fn write_file(file: &String, run: &Run) {
+fn write_file(file: &String, run: &Run) -> Result<(), Box<dyn Error>> {
     let run = RunFile::new(&run);
-    file::write(file, run);
+    file::write(file, run)
 }
