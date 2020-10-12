@@ -14,6 +14,26 @@ pub struct Run {
     pub segments: Vec<Segment>,
 }
 
+impl Default for Run {
+    fn default() -> Self {
+        let segments = vec![Segment {
+            name: "Example Segment".to_string(),
+            icon: None,
+            segment_history: Vec::new(),
+            split_times: Vec::new(),
+            best_segment_time: None,
+        }];
+
+        Self {
+            game_name: "Example Splits".to_string(),
+            category_name: "Any%".to_string(),
+            attempt_count: 0,
+            attempt_history: Vec::new(),
+            segments: segments,
+        }
+    }
+}
+
 impl Run {
     pub fn new(run: &LivesplitRun) -> Self {
         let mut attempt_history: Vec<Attempt> = Vec::new();
@@ -64,7 +84,7 @@ impl Run {
                         false,
                     )),
                 }],
-                best_segment_time: best_time,
+                best_segment_time: Some(best_time),
             };
 
             for history in segment.segment_history() {
@@ -116,7 +136,7 @@ pub struct Segment {
     pub name: String,
     pub icon: Option<String>,
     pub split_times: Vec<SplitTime>,
-    pub best_segment_time: SplitTime,
+    pub best_segment_time: Option<SplitTime>,
     pub segment_history: Vec<SplitTime>,
 }
 

@@ -23,6 +23,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .long("display")
                 .default_value("terminal"),
         )
+        .arg(
+            Arg::with_name("create_file")
+                .short("c")
+                .long("create-file")
+                .required(false)
+                .takes_value(false),
+        )
         .get_matches();
 
     let input: &str;
@@ -32,10 +39,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("Input file required");
     }
 
-    let mut timer = WlSplitTimer::new(input.to_string());
+    let create_file = matches.is_present("create_file");
 
-    timer.start();
-    timer.pause();
+    let mut timer = WlSplitTimer::new(input.to_string(), create_file);
+
+    if create_file {
+        return timer.write_file();
+    }
 
     if let Some(display) = matches.value_of("display") {
         let mut app = get_app(display, timer)?;
