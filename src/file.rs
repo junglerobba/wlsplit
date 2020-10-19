@@ -58,7 +58,11 @@ impl Run {
 
         let mut segments: Vec<Segment> = Vec::new();
         for segment in run.segments() {
-            let msecs = match segment.best_segment_time().real_time {
+            let best_segment_time = match segment.best_segment_time().real_time {
+                Some(time) => time.total_milliseconds() as u128,
+                None => 0,
+            };
+            let best_split_time = match segment.personal_best_split_time().real_time {
                 Some(time) => time.total_milliseconds() as u128,
                 None => 0,
             };
@@ -66,7 +70,7 @@ impl Run {
                 id: None,
                 name: None,
                 time: Some(WlSplitTimer::format_time(
-                    msecs,
+                    best_segment_time,
                     TimeFormat::default(),
                     false,
                 )),
@@ -79,7 +83,7 @@ impl Run {
                     id: None,
                     name: Some("Personal Best".to_string()),
                     time: Some(WlSplitTimer::format_time(
-                        msecs,
+                        best_split_time,
                         TimeFormat::default(),
                         false,
                     )),
