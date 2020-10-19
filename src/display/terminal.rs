@@ -33,8 +33,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(timer: WlSplitTimer) -> Result<Self, Box<dyn Error>> {
-        Ok(Self { timer })
+    pub fn new(timer: WlSplitTimer) -> Self {
+        Self { timer }
     }
 }
 

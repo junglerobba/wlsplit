@@ -1,4 +1,4 @@
-use crate::display::App as TerminalApp;
+use crate::display::TerminalApp;
 use clap::{App, Arg};
 use std::error::Error;
 use wl_split_timer::WlSplitTimer;
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(display) = matches.value_of("display") {
-        let mut app = get_app(display, timer)?;
+        let mut app = get_app(display, timer);
         app.run()?;
     } else {
         panic!()
@@ -57,9 +57,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_app(display: &str, timer: WlSplitTimer) -> Result<impl TimerDisplay, Box<dyn Error>> {
+fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {
     match display {
-        "terminal" => TerminalApp::new(timer),
+        "terminal" => Box::new(TerminalApp::new(timer)),
         _ => {
             panic!("Unknown method");
         }
