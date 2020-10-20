@@ -219,8 +219,8 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>, row: &mut Vec<Strin
     if let (Some(time), Some(best)) = (time, best) {
         let negative: bool;
         let diff: u128;
-        let time: u128 = time.to_duration().num_milliseconds().try_into().unwrap();
-        let best: u128 = best.to_duration().num_milliseconds().try_into().unwrap();
+        let time = time.to_duration().num_milliseconds() as u128;
+        let best = best.to_duration().num_milliseconds() as u128;
         if best > time {
             negative = true;
             diff = best - time;

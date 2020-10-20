@@ -1,4 +1,4 @@
-use std::{convert::TryInto, error::Error};
+use std::error::Error;
 
 use crate::file::{self, Run as RunFile};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
@@ -6,11 +6,6 @@ use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 const MSEC_HOUR: u128 = 3600000;
 const MSEC_MINUTE: u128 = 60000;
 const MSEC_SECOND: u128 = 1000;
-
-pub struct WlSplitTimer {
-    pub timer: Timer,
-    file: String,
-}
 
 pub struct TimeFormat {
     pub hours: usize,
@@ -28,6 +23,11 @@ impl Default for TimeFormat {
             msecs: 3,
         }
     }
+}
+
+pub struct WlSplitTimer {
+    pub timer: Timer,
+    file: String,
 }
 
 impl WlSplitTimer {
@@ -114,33 +114,36 @@ impl WlSplitTimer {
         let mut sum: usize = 0;
         for segment in self.timer.run().segments() {
             if let Some(time) = segment.best_segment_time().real_time {
-                sum = sum + (time.total_milliseconds() as usize);
+                sum += time.total_milliseconds() as usize;
             }
         }
         sum
     }
 
     pub fn best_possible_time(&self) -> usize {
-        let mut index = match self.current_segment_index() {
-            Some(i) => i,
-            None => 0,
-        };
+        let index = self.current_segment_index().unwrap_or(0);
 
         if index == 0 {
             return self.sum_of_best_segments();
         }
 
-        let mut time: usize = match self.run().segment(index - 1).split_time().real_time {
-            Some(split) => split.total_milliseconds() as usize,
-            None => 0,
-        };
+        let mut time: usize = self
+            .run()
+            .segment(index - 1)
+            .split_time()
+            .real_time
+            .unwrap_or_default()
+            .total_milliseconds() as usize;
 
         for i in index..self.run().segments().len() {
-            let segment = match self.run().segment(i).best_segment_time().real_time {
-                Some(t) => t.total_milliseconds() as usize,
-                None => 0,
-            };
-            time = time + segment;
+            let segment = self
+                .run()
+                .segment(i)
+                .best_segment_time()
+                .real_time
+                .unwrap_or_default()
+                .total_milliseconds() as usize;
+            time += segment;
         }
 
         time
@@ -150,11 +153,11 @@ impl WlSplitTimer {
         let prefix = if negative { "-" } else { "" };
         let mut time = time;
         let hours = time / MSEC_HOUR;
-        time = time - (hours * MSEC_HOUR);
+        time -= hours * MSEC_HOUR;
         let minutes = time / MSEC_MINUTE;
-        time = time - (minutes * MSEC_MINUTE);
+        time -= minutes * MSEC_MINUTE;
         let seconds = time / MSEC_SECOND;
-        time = time - (seconds * MSEC_SECOND);
+        time -= seconds * MSEC_SECOND;
 
         format!(
             "{}{}:{}:{}.{}",
@@ -171,15 +174,15 @@ impl WlSplitTimer {
         let mut time: u128 = 0;
         let vec: Vec<&str> = split.collect();
 
-        time = time + (MSEC_HOUR * vec[0].parse::<u128>().unwrap());
-        time = time + (MSEC_MINUTE * vec[1].parse::<u128>().unwrap());
+        time += MSEC_HOUR * vec[0].parse::<u128>().unwrap_or(0);
+        time += MSEC_MINUTE * vec[1].parse::<u128>().unwrap_or(0);
 
         let split = vec[2].split(".");
         let vec: Vec<&str> = split.collect();
 
-        time = time + (MSEC_SECOND * vec[0].parse::<u128>().unwrap());
+        time += MSEC_SECOND * vec[0].parse::<u128>().unwrap_or(0);
         let msecs: String = vec[1].chars().take(3).collect();
-        time = time + msecs.parse::<u128>().unwrap();
+        time += msecs.parse::<u128>().unwrap_or(0);
 
         time
     }
@@ -219,7 +222,7 @@ fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
 fn file_to_run(_run: RunFile, run: &mut Run) {
     run.set_game_name(_run.game_name);
     run.set_category_name(_run.category_name);
-    run.set_attempt_count(_run.attempt_count.try_into().unwrap());
+    run.set_attempt_count(_run.attempt_count as u32);
 
     for segment in _run.segments {
         let mut _segment = Segment::new(segment.name);

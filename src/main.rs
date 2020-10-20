@@ -31,12 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .get_matches();
 
-    let input: &str;
-    if let Some(file) = matches.value_of("file") {
-        input = file;
-    } else {
-        panic!("Input file required");
-    }
+    let input = matches.value_of("file").expect("Input file required!");
 
     let create_file = matches.is_present("create_file");
 
@@ -46,12 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         return timer.write_file();
     }
 
-    if let Some(display) = matches.value_of("display") {
-        let mut app = get_app(display, timer);
-        app.run()?;
-    } else {
-        panic!()
-    }
+    let display = matches.value_of("display").unwrap();
+    let mut app = get_app(display, timer);
+    app.run()?;
 
     Ok(())
 }
