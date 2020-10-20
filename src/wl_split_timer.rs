@@ -1,6 +1,6 @@
 use std::{convert::TryInto, error::Error};
 
-use crate::file::{self, read, Run as RunFile};
+use crate::file::{self, Run as RunFile};
 use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
@@ -204,7 +204,7 @@ fn pad_zeroes(time: u128, length: usize) -> String {
 }
 
 fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
-    match file::read::<RunFile>(file) {
+    match file::read_json::<RunFile>(file) {
         Ok(_run) => {
             file_to_run(_run, run);
         }
@@ -251,5 +251,5 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
 
 fn write_file(file: &String, run: &Run) -> Result<(), Box<dyn Error>> {
     let run = RunFile::new(&run);
-    file::write(file, run)
+    file::write_json(file, run)
 }

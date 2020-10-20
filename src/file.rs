@@ -139,7 +139,7 @@ pub struct Segment {
     pub segment_history: Vec<SplitTime>,
 }
 
-pub fn read<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
+pub fn read_json<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
     let mut file = match File::open(path) {
         Ok(file) => file,
         Err(_) => {
@@ -162,8 +162,8 @@ pub fn read<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
     Ok(result)
 }
 
-pub fn write(path: &String, run: Run) -> Result<(), Box<dyn Error>> {
-    let serialized = serde_json::to_string_pretty(&run)?;
+pub fn write_json<T: Serialize>(path: &String, data: T) -> Result<(), Box<dyn Error>> {
+    let serialized = serde_json::to_string_pretty(&data)?;
     let path = format!("{}", path);
     let mut file = File::create(path)?;
     file.write_all(serialized.as_bytes())?;
