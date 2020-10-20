@@ -37,74 +37,69 @@ impl Default for Run {
 impl Run {
     pub fn new(run: &LivesplitRun) -> Self {
         let mut attempt_history: Vec<Attempt> = Vec::new();
-
         for attempt in run.attempt_history() {
-            let msecs = match attempt.time().real_time {
-                Some(time) => time.total_milliseconds() as u128,
-                None => 0,
-            };
-            let _attempt = Attempt {
-                time: Some(WlSplitTimer::format_time(
-                    msecs,
-                    TimeFormat::default(),
-                    false,
-                )),
-                id: attempt.index() as usize,
-                started: None,
-                ended: None,
-            };
-            attempt_history.push(_attempt);
+            if let Some(time) = attempt.time().real_time {
+                attempt_history.push(Attempt {
+                    time: Some(WlSplitTimer::format_time(
+                        time.total_milliseconds() as u128,
+                        TimeFormat::default(),
+                        false,
+                    )),
+                    id: attempt.index() as usize,
+                    started: None,
+                    ended: None,
+                });
+            }
         }
 
         let mut segments: Vec<Segment> = Vec::new();
         for segment in run.segments() {
             let best_segment_time = match segment.best_segment_time().real_time {
-                Some(time) => time.total_milliseconds() as u128,
-                None => 0,
+                Some(time) => Some(SplitTime {
+                    id: None,
+                    name: None,
+                    time: Some(WlSplitTimer::format_time(
+                        time.total_milliseconds() as u128,
+                        TimeFormat::default(),
+                        false,
+                    )),
+                }),
+                None => None,
             };
-            let best_split_time = match segment.personal_best_split_time().real_time {
-                Some(time) => time.total_milliseconds() as u128,
-                None => 0,
+
+            let mut split_times: Vec<SplitTime> = Vec::new();
+            if let Some(time) = segment.personal_best_split_time().real_time {
+                split_times.push(SplitTime {
+                    id: None,
+                    name: Some("Personal Best".to_string()),
+                    time: Some(WlSplitTimer::format_time(
+                        time.total_milliseconds() as u128,
+                        TimeFormat::default(),
+                        false,
+                    )),
+                })
             };
-            let best_time = SplitTime {
-                id: None,
-                name: None,
-                time: Some(WlSplitTimer::format_time(
-                    best_segment_time,
-                    TimeFormat::default(),
-                    false,
-                )),
-            };
+
             let mut _segment = Segment {
                 name: segment.name().to_string(),
                 icon: None,
                 segment_history: Vec::new(),
-                split_times: vec![SplitTime {
-                    id: None,
-                    name: Some("Personal Best".to_string()),
-                    time: Some(WlSplitTimer::format_time(
-                        best_split_time,
-                        TimeFormat::default(),
-                        false,
-                    )),
-                }],
-                best_segment_time: Some(best_time),
+                split_times: split_times,
+                best_segment_time: best_segment_time,
             };
 
             for history in segment.segment_history() {
-                let msecs = match history.1.real_time {
-                    Some(time) => time.total_milliseconds() as u128,
-                    None => 0,
-                };
-                _segment.segment_history.push(SplitTime {
-                    id: Some(history.0 as usize),
-                    name: None,
-                    time: Some(WlSplitTimer::format_time(
-                        msecs,
-                        TimeFormat::default(),
-                        false,
-                    )),
-                });
+                if let Some(time) = history.1.real_time {
+                    _segment.segment_history.push(SplitTime {
+                        id: Some(history.0 as usize),
+                        name: None,
+                        time: Some(WlSplitTimer::format_time(
+                            time.total_milliseconds() as u128,
+                            TimeFormat::default(),
+                            false,
+                        )),
+                    });
+                }
             }
 
             segments.push(_segment);
