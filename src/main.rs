@@ -4,7 +4,6 @@ use std::error::Error;
 use wl_split_timer::WlSplitTimer;
 
 mod display;
-mod event;
 mod file;
 mod wl_split_timer;
 

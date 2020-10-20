@@ -7,7 +7,7 @@ use livesplit_core::TimeSpan;
 use std::io::{stdout, Write};
 use std::{convert::TryInto, error::Error};
 
-use crate::{event, wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
+use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -18,6 +18,8 @@ use tui::{
     widgets::{Block, Borders},
     Terminal,
 };
+
+use super::{Event, Events};
 
 const TICKRATE: u64 = 10;
 
@@ -48,12 +50,12 @@ impl TimerDisplay for App {
         let mut terminal = Terminal::new(backend)?;
         terminal.hide_cursor()?;
 
-        let events = event::Events::new(TICKRATE);
+        let events = Events::new(TICKRATE);
 
         loop {
             let mut rows: Vec<Vec<String>> = Vec::new();
             match events.next()? {
-                event::Event::Input(key) => {
+                Event::Input(key) => {
                     if key == KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)
                         || key == KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)
                     {
@@ -72,7 +74,7 @@ impl TimerDisplay for App {
                         self.timer.pause();
                     }
                 }
-                event::Event::Tick => {
+                Event::Tick => {
                     for i in 0..self.timer.segments().len() {
                         let mut row = Vec::new();
                         let index: usize;
