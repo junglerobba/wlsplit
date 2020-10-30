@@ -135,10 +135,8 @@ impl WlSplitTimer {
             .unwrap_or_default()
             .total_milliseconds() as usize;
 
-        for i in index..self.run().segments().len() {
-            let segment = self
-                .run()
-                .segment(i)
+        for segment in self.run().segments().into_iter().skip(index) {
+            let segment = segment
                 .best_segment_time()
                 .real_time
                 .unwrap_or_default()
@@ -240,8 +238,8 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
             }
         }
 
-        for i in 0..segment.segment_history.len() {
-            if let Some(time) = &segment.segment_history[i].time {
+        for (i, split_time) in segment.segment_history.into_iter().enumerate() {
+            if let Some(time) = split_time.time {
                 _segment
                     .segment_history_mut()
                     .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));

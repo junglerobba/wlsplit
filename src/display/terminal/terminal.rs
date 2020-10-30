@@ -75,7 +75,7 @@ impl TimerDisplay for App {
                     }
                 }
                 Event::Tick => {
-                    for i in 0..self.timer.segments().len() {
+                    for (i, segment) in self.timer.segments().into_iter().enumerate() {
                         let mut row = Vec::new();
                         let index: usize;
                         if let Some(segment_index) = self.timer.current_segment_index() {
@@ -86,23 +86,21 @@ impl TimerDisplay for App {
 
                         // Segment
                         if i == index {
-                            row.push(format!("> {}", self.timer.segments()[i].name().to_string()));
+                            row.push(format!("> {}", segment.name().to_string()));
                         } else {
-                            row.push(format!("  {}", self.timer.segments()[i].name().to_string()));
+                            row.push(format!("  {}", segment.name().to_string()));
                         }
 
                         // Current
                         if i == index {
                             diff_time(
                                 self.timer.time(),
-                                self.timer.segments()[i]
-                                    .personal_best_split_time()
-                                    .real_time,
+                                segment.personal_best_split_time().real_time,
                                 &mut row,
                             );
                         } else if i < index {
                             diff_time(
-                                self.timer.segments()[i].split_time().real_time,
+                                segment.split_time().real_time,
                                 self.timer.segments()[i]
                                     .personal_best_split_time()
                                     .real_time,
@@ -113,10 +111,7 @@ impl TimerDisplay for App {
                         }
 
                         // Best
-                        if let Some(time) = self.timer.segments()[i]
-                            .personal_best_split_time()
-                            .real_time
-                        {
+                        if let Some(time) = segment.personal_best_split_time().real_time {
                             row.push(WlSplitTimer::format_time(
                                 time.to_duration().num_milliseconds().try_into().unwrap(),
                                 TIMEFORMAT,
@@ -131,7 +126,7 @@ impl TimerDisplay for App {
                                 ));
                             }
                         } else if i < index {
-                            if let Some(time) = self.timer.segments()[i].split_time().real_time {
+                            if let Some(time) = segment.split_time().real_time {
                                 row.push(WlSplitTimer::format_time(
                                     time.to_duration().num_milliseconds().try_into().unwrap(),
                                     TIMEFORMAT,
