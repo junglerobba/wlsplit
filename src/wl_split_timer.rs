@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::file::{self, Run as RunFile};
-use livesplit_core::{Run, Segment, Time, TimeSpan, Timer, TimerPhase};
+use livesplit_core::{Attempt, Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
 const MSEC_MINUTE: u128 = 60000;
@@ -221,6 +221,15 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
     run.set_game_name(_run.game_name);
     run.set_category_name(_run.category_name);
     run.set_attempt_count(_run.attempt_count as u32);
+
+    for attempt in _run.attempt_history {
+        let time = match attempt.time {
+            Some(t) => t,
+            _ => continue,
+        };
+        let time = WlSplitTimer::string_to_time(time);
+        run.add_attempt_with_index(time, attempt.id, None, None, None);
+    }
 
     for segment in _run.segments {
         let mut _segment = Segment::new(segment.name);
