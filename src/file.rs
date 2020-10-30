@@ -45,7 +45,7 @@ impl Run {
                         TimeFormat::default(),
                         false,
                     )),
-                    id: attempt.index() as usize,
+                    id: attempt.index(),
                     started: None,
                     ended: None,
                 });
@@ -91,7 +91,7 @@ impl Run {
             for history in segment.segment_history() {
                 if let Some(time) = history.1.real_time {
                     _segment.segment_history.push(SplitTime {
-                        id: Some(history.0 as usize),
+                        id: Some(history.0),
                         name: None,
                         time: Some(WlSplitTimer::format_time(
                             time.total_milliseconds() as u128,
@@ -117,7 +117,7 @@ impl Run {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Attempt {
-    pub id: usize,
+    pub id: i32,
     pub started: Option<String>,
     pub ended: Option<String>,
     pub time: Option<String>,
@@ -127,7 +127,7 @@ pub struct Attempt {
 pub struct SplitTime {
     pub name: Option<String>,
     pub time: Option<String>,
-    pub id: Option<usize>,
+    pub id: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

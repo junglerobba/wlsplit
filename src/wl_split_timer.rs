@@ -238,11 +238,11 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
             }
         }
 
-        for (i, split_time) in segment.segment_history.into_iter().enumerate() {
-            if let Some(time) = split_time.time {
+        for split in segment.segment_history {
+            if let (Some(time), Some(id)) = (split.time, split.id) {
                 _segment
                     .segment_history_mut()
-                    .insert(i as i32, WlSplitTimer::string_to_time(time.to_string()));
+                    .insert(id, WlSplitTimer::string_to_time(time.to_string()));
             }
         }
 
