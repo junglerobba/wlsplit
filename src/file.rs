@@ -46,8 +46,15 @@ impl Run {
                         false,
                     )),
                     id: attempt.index(),
-                    started: None,
-                    ended: None,
+                    started: attempt.started().map(|t| t.time.to_rfc3339()),
+                    ended: attempt.ended().map(|t| t.time.to_rfc3339()),
+                    pause_time: attempt.pause_time().map(|t| {
+                        WlSplitTimer::format_time(
+                            t.total_milliseconds() as u128,
+                            TimeFormat::default(),
+                            false,
+                        )
+                    }),
                 });
             }
         }
@@ -121,6 +128,7 @@ pub struct Attempt {
     pub started: Option<String>,
     pub ended: Option<String>,
     pub time: Option<String>,
+    pub pause_time: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

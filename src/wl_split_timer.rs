@@ -1,7 +1,8 @@
 use std::error::Error;
 
 use crate::file::{self, Run as RunFile};
-use livesplit_core::{Attempt, Run, Segment, Time, TimeSpan, Timer, TimerPhase};
+use chrono::{DateTime, Utc};
+use livesplit_core::{AtomicDateTime, Run, Segment, Time, TimeSpan, Timer, TimerPhase};
 
 const MSEC_HOUR: u128 = 3600000;
 const MSEC_MINUTE: u128 = 60000;
@@ -228,7 +229,20 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
             _ => continue,
         };
         let time = WlSplitTimer::string_to_time(time);
-        run.add_attempt_with_index(time, attempt.id, None, None, None);
+        let started = attempt.started.and_then(|t| {
+            DateTime::parse_from_rfc3339(&t)
+                .map(|t| AtomicDateTime::new(t.with_timezone(&Utc), false))
+                .ok()
+        });
+        let ended = attempt.ended.and_then(|t| {
+            DateTime::parse_from_rfc3339(&t)
+                .map(|t| AtomicDateTime::new(t.with_timezone(&Utc), false))
+                .ok()
+        });
+        let pause_time = attempt
+            .pause_time
+            .map(|t| TimeSpan::from_milliseconds(WlSplitTimer::parse_time_string(t) as f64));
+        run.add_attempt_with_index(time, attempt.id, started, ended, pause_time);
     }
 
     for segment in _run.segments {

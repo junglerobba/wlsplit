@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 livesplit-core = "*"
 clap = "*"
+chrono = "*"
 termion = "*"
 tui = { version = "0.10.0", features = ["crossterm"], default-features = false }
 rand = "*"
