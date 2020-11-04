@@ -205,17 +205,8 @@ fn pad_zeroes(time: u128, length: usize) -> String {
     format!("{}{}", zeroes, time)
 }
 
-fn read_file(file: &String, run: &mut Run) -> Result<(), ()> {
-    match file::read_json::<RunFile>(file) {
-        Ok(_run) => {
-            file_to_run(_run, run);
-        }
-        Err(_) => {
-            return Err(());
-        }
-    }
-
-    Ok(())
+fn read_file(file: &String, run: &mut Run) -> Result<(), Box<dyn Error>> {
+    file::read_json::<RunFile>(file).map(|json| file_to_run(json, run))
 }
 
 fn file_to_run(_run: RunFile, run: &mut Run) {

@@ -61,18 +61,15 @@ impl Run {
 
         let mut segments: Vec<Segment> = Vec::new();
         for segment in run.segments() {
-            let best_segment_time = match segment.best_segment_time().real_time {
-                Some(time) => Some(SplitTime {
-                    id: None,
-                    name: None,
-                    time: Some(WlSplitTimer::format_time(
-                        time.total_milliseconds() as u128,
-                        TimeFormat::default(),
-                        false,
-                    )),
-                }),
-                None => None,
-            };
+            let best_segment_time = segment.best_segment_time().real_time.map(|t| SplitTime {
+                id: None,
+                name: None,
+                time: Some(WlSplitTimer::format_time(
+                    t.total_milliseconds() as u128,
+                    TimeFormat::default(),
+                    false,
+                )),
+            });
 
             let mut split_times: Vec<SplitTime> = Vec::new();
             if let Some(time) = segment.personal_best_split_time().real_time {
@@ -147,25 +144,11 @@ pub struct Segment {
     pub segment_history: Vec<SplitTime>,
 }
 
-pub fn read_json<T: DeserializeOwned>(path: &String) -> Result<T, ()> {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => {
-            return Err(());
-        }
-    };
+pub fn read_json<T: DeserializeOwned>(path: &String) -> Result<T, Box<dyn Error>> {
+    let mut file = File::open(path)?;
     let mut content = String::new();
-    if let Err(_) = file.read_to_string(&mut content) {
-        return Err(());
-    }
-
-    let result: T = match serde_json::from_str(&content) {
-        Ok(content) => content,
-        Err(err) => {
-            println!("{}", err);
-            return Err(());
-        }
-    };
+    file.read_to_string(&mut content)?;
+    let result: T = serde_json::from_str(&content)?;
 
     Ok(result)
 }
