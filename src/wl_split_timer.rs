@@ -42,7 +42,7 @@ impl WlSplitTimer {
             read_file(&file, &mut run).expect("Unable to parse file");
         }
 
-        let mut timer = Timer::new(run).expect("At least one segment expected");
+        let timer = Timer::new(run).expect("At least one segment expected");
 
         Self { timer, file }
     }
@@ -190,7 +190,7 @@ impl WlSplitTimer {
         let time = WlSplitTimer::parse_time_string(string) as f64;
         let time_span = TimeSpan::from_milliseconds(time);
 
-        let mut time: Time = Time::new();
+        let time: Time = Time::new();
         time.with_real_time(Some(time_span))
     }
 }

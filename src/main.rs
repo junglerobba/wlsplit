@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let create_file = matches.is_present("create_file");
 
-    let mut timer = WlSplitTimer::new(input.to_string(), create_file);
+    let timer = WlSplitTimer::new(input.to_string(), create_file);
 
     if create_file {
         return timer.write_file();
