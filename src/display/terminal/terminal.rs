@@ -77,12 +77,7 @@ impl TimerDisplay for App {
                 Event::Tick => {
                     for (i, segment) in self.timer.segments().into_iter().enumerate() {
                         let mut row = Vec::new();
-                        let index: usize;
-                        if let Some(segment_index) = self.timer.current_segment_index() {
-                            index = segment_index;
-                        } else {
-                            break;
-                        }
+                        let index = self.timer.current_segment_index().unwrap_or(0);
 
                         // Segment
                         if i == index {

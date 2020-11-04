@@ -79,8 +79,6 @@ impl WlSplitTimer {
 
     pub fn reset(&mut self, update_splits: bool) {
         self.timer.reset(update_splits);
-        self.timer.start();
-        self.timer.pause();
     }
 
     pub fn write_file(&self) -> Result<(), Box<dyn Error>> {
