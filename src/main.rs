@@ -8,9 +8,13 @@ mod file;
 mod wl_split_timer;
 
 pub trait TimerDisplay {
-    fn run(&mut self) -> Result<(), Box<dyn Error>>;
+    fn run(&self) -> Result<(), Box<dyn Error>>;
 
     fn split(&mut self);
+
+    fn start(&mut self);
+
+    fn pause(&mut self);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

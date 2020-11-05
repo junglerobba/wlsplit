@@ -41,7 +41,7 @@ impl App {
 }
 
 impl TimerDisplay for App {
-    fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    fn run(&self) -> Result<(), Box<dyn Error>> {
         let mut stdout = stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         enable_raw_mode()?;
@@ -60,18 +60,6 @@ impl TimerDisplay for App {
                         || key == KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)
                     {
                         break;
-                    }
-                    if key == KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE) {
-                        self.timer.split();
-                    }
-                    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE) {
-                        self.timer.reset(true);
-                    }
-                    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL) {
-                        self.timer.reset(false);
-                    }
-                    if key == KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE) {
-                        self.timer.pause();
                     }
                 }
                 Event::Tick => {
@@ -202,6 +190,14 @@ impl TimerDisplay for App {
 
     fn split(&mut self) {
         self.timer.split();
+    }
+
+    fn start(&mut self) {
+        self.timer.start();
+    }
+
+    fn pause(&mut self) {
+        self.timer.pause();
     }
 }
 
