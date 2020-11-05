@@ -4,8 +4,11 @@ use crossterm::{
 };
 
 use livesplit_core::TimeSpan;
-use std::io::{stdout, Write};
 use std::{convert::TryInto, error::Error};
+use std::{
+    io::{stdout, Stdout, Write},
+    process,
+};
 
 use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use tui::{
@@ -32,176 +35,172 @@ const TIMEFORMAT: TimeFormat = TimeFormat {
 
 pub struct App {
     timer: WlSplitTimer,
+    terminal: Terminal<CrosstermBackend<Stdout>>,
+    events: Events,
 }
 
 impl App {
     pub fn new(timer: WlSplitTimer) -> Self {
-        Self { timer }
+        let mut stdout = stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
+        enable_raw_mode().unwrap();
+
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.hide_cursor().unwrap();
+
+        let events = Events::new(TICKRATE);
+        Self { timer, terminal, events }
     }
 }
 
 impl TimerDisplay for App {
     fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut stdout = stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        enable_raw_mode()?;
-
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
-        terminal.hide_cursor()?;
-
-        let events = Events::new(TICKRATE);
-
-        loop {
-            let mut rows: Vec<Vec<String>> = Vec::new();
-            match events.next()? {
-                Event::Input(key) => {
-                    if key == KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)
-                        || key == KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)
-                    {
-                        break;
-                    }
-                    if key == KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE) {
-                        self.timer.split();
-                    }
-                    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE) {
-                        self.timer.reset(true);
-                    }
-                    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL) {
-                        self.timer.reset(false);
-                    }
-                    if key == KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE) {
-                        self.timer.pause();
-                    }
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        match self.events.next()? {
+            Event::Input(key) => {
+                if key == KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)
+                    || key == KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)
+                {
+                    process::exit(0);
                 }
-                Event::Tick => {
-                    for (i, segment) in self.timer.segments().into_iter().enumerate() {
-                        let mut row = Vec::new();
-                        let index = self.timer.current_segment_index().unwrap_or(0);
+            }
+            Event::Tick => {
+                for (i, segment) in self.timer.segments().into_iter().enumerate() {
+                    let mut row = Vec::new();
+                    let index = self.timer.current_segment_index().unwrap_or(0);
 
-                        // Segment
-                        if i == index {
-                            row.push(format!("> {}", segment.name().to_string()));
-                        } else {
-                            row.push(format!("  {}", segment.name().to_string()));
-                        }
-
-                        // Current
-                        if i == index {
-                            diff_time(
-                                self.timer.time(),
-                                segment.personal_best_split_time().real_time,
-                                &mut row,
-                            );
-                        } else if i < index {
-                            diff_time(
-                                segment.split_time().real_time,
-                                self.timer.segments()[i]
-                                    .personal_best_split_time()
-                                    .real_time,
-                                &mut row,
-                            );
-                        } else {
-                            row.push("".to_string());
-                        }
-
-                        // Best
-                        if let Some(time) = segment.personal_best_split_time().real_time {
-                            row.push(WlSplitTimer::format_time(
-                                time.to_duration().num_milliseconds().try_into().unwrap(),
-                                TIMEFORMAT,
-                                false,
-                            ));
-                        } else if i == index {
-                            if let Some(time) = self.timer.time() {
-                                row.push(WlSplitTimer::format_time(
-                                    time.to_duration().num_milliseconds().try_into().unwrap(),
-                                    TIMEFORMAT,
-                                    false,
-                                ));
-                            }
-                        } else if i < index {
-                            if let Some(time) = segment.split_time().real_time {
-                                row.push(WlSplitTimer::format_time(
-                                    time.to_duration().num_milliseconds().try_into().unwrap(),
-                                    TIMEFORMAT,
-                                    false,
-                                ));
-                            }
-                        } else {
-                            row.push("-:--:--.---".to_string());
-                        }
-
-                        rows.push(row);
+                    // Segment
+                    if i == index {
+                        row.push(format!("> {}", segment.name().to_string()));
+                    } else {
+                        row.push(format!("  {}", segment.name().to_string()));
                     }
 
-                    if let Some(time) = self.timer.time() {
-                        let mut row = Vec::new();
+                    // Current
+                    if i == index {
+                        diff_time(
+                            self.timer.time(),
+                            segment.personal_best_split_time().real_time,
+                            &mut row,
+                        );
+                    } else if i < index {
+                        diff_time(
+                            segment.split_time().real_time,
+                            self.timer.segments()[i]
+                                .personal_best_split_time()
+                                .real_time,
+                            &mut row,
+                        );
+                    } else {
                         row.push("".to_string());
-                        row.push("".to_string());
+                    }
+
+                    // Best
+                    if let Some(time) = segment.personal_best_split_time().real_time {
                         row.push(WlSplitTimer::format_time(
                             time.to_duration().num_milliseconds().try_into().unwrap(),
                             TIMEFORMAT,
                             false,
                         ));
-                        rows.push(row);
+                    } else if i == index {
+                        if let Some(time) = self.timer.time() {
+                            row.push(WlSplitTimer::format_time(
+                                time.to_duration().num_milliseconds().try_into().unwrap(),
+                                TIMEFORMAT,
+                                false,
+                            ));
+                        }
+                    } else if i < index {
+                        if let Some(time) = segment.split_time().real_time {
+                            row.push(WlSplitTimer::format_time(
+                                time.to_duration().num_milliseconds().try_into().unwrap(),
+                                TIMEFORMAT,
+                                false,
+                            ));
+                        }
+                    } else {
+                        row.push("-:--:--.---".to_string());
                     }
 
-                    let mut row = Vec::new();
-                    row.push("".to_string());
-                    row.push("Sum of best segments".to_string());
-                    row.push(WlSplitTimer::format_time(
-                        self.timer.sum_of_best_segments() as u128,
-                        TIMEFORMAT,
-                        false,
-                    ));
                     rows.push(row);
+                }
 
+                if let Some(time) = self.timer.time() {
                     let mut row = Vec::new();
                     row.push("".to_string());
-                    row.push("Best possible time".to_string());
+                    row.push("".to_string());
                     row.push(WlSplitTimer::format_time(
-                        self.timer.best_possible_time() as u128,
+                        time.to_duration().num_milliseconds().try_into().unwrap(),
                         TIMEFORMAT,
                         false,
                     ));
                     rows.push(row);
                 }
+
+                let mut row = Vec::new();
+                row.push("".to_string());
+                row.push("Sum of best segments".to_string());
+                row.push(WlSplitTimer::format_time(
+                    self.timer.sum_of_best_segments() as u128,
+                    TIMEFORMAT,
+                    false,
+                ));
+                rows.push(row);
+
+                let mut row = Vec::new();
+                row.push("".to_string());
+                row.push("Best possible time".to_string());
+                row.push(WlSplitTimer::format_time(
+                    self.timer.best_possible_time() as u128,
+                    TIMEFORMAT,
+                    false,
+                ));
+                rows.push(row);
             }
-
-            terminal.draw(|f| {
-                let rects = Layout::default()
-                    .constraints([Constraint::Percentage(0)].as_ref())
-                    .margin(5)
-                    .split(f.size());
-
-                let selected_style = Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD);
-                let normal_style = Style::default().fg(Color::White);
-                let header = ["Segment", "Current", "Best"];
-                let rows = rows.iter().map(|i| Row::StyledData(i.iter(), normal_style));
-                let t = Table::new(header.iter(), rows)
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(self.timer.run().attempt_count().to_string()),
-                    )
-                    .highlight_style(selected_style)
-                    .highlight_symbol(">> ")
-                    .widths(&[
-                        Constraint::Percentage(40),
-                        Constraint::Percentage(30),
-                        Constraint::Percentage(30),
-                    ]);
-                f.render_stateful_widget(t, rects[0], &mut TableState::default());
-            })?;
         }
+        let title = format!(
+            "{} {} - {}",
+            self.timer.run().game_name(),
+            self.timer.run().category_name(),
+            self.timer.run().attempt_count()
+        );
+        self.terminal.draw(|f| {
+            let rects = Layout::default()
+                .constraints([Constraint::Percentage(0)].as_ref())
+                .margin(5)
+                .split(f.size());
+
+            let selected_style = Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD);
+            let normal_style = Style::default().fg(Color::White);
+            let header = ["Segment", "Current", "Best"];
+            let rows = rows.iter().map(|i| Row::StyledData(i.iter(), normal_style));
+            let t = Table::new(header.iter(), rows)
+                .block(Block::default().borders(Borders::ALL).title(title))
+                .highlight_style(selected_style)
+                .highlight_symbol(">> ")
+                .widths(&[
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(30),
+                ]);
+            f.render_stateful_widget(t, rects[0], &mut TableState::default());
+        })?;
         Ok(())
     }
 
     fn split(&mut self) {
         self.timer.split();
+    }
+
+    fn start(&mut self) {
+        self.timer.start();
+    }
+
+    fn pause(&mut self) {
+        self.timer.pause();
     }
 }
 

@@ -11,6 +11,10 @@ pub trait TimerDisplay {
     fn run(&mut self) -> Result<(), Box<dyn Error>>;
 
     fn split(&mut self);
+
+    fn start(&mut self);
+
+    fn pause(&mut self);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -44,6 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let display = matches.value_of("display").unwrap();
     let mut app = get_app(display, timer);
     app.run()?;
+    app.start();
+    loop {
+        app.run()?;
+    }
 
     Ok(())
 }
