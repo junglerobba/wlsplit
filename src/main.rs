@@ -7,8 +7,9 @@ mod display;
 mod file;
 mod wl_split_timer;
 
+const SOCKET_PATH: &str = "/tmp/wlsplit.sock";
 pub trait TimerDisplay {
-    fn run(&self) -> Result<(), Box<dyn Error>>;
+    fn run(&mut self) -> Result<(), Box<dyn Error>>;
 
     fn split(&mut self);
 
@@ -48,6 +49,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let display = matches.value_of("display").unwrap();
     let mut app = get_app(display, timer);
     app.run()?;
+    app.start();
+    loop {
+        app.run()?;
+    }
 
     Ok(())
 }
