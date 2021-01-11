@@ -1,23 +1,26 @@
 use crate::display::TerminalApp;
+use async_trait::async_trait;
 use clap::{App, Arg};
-use std::error::Error;
+use std::{error::Error, sync::Arc, time::Duration};
+use tokio::{sync::Mutex, time::sleep};
 use wl_split_timer::WlSplitTimer;
-
 mod display;
 mod file;
 mod wl_split_timer;
 
-pub trait TimerDisplay {
-    fn run(&mut self) -> Result<(), Box<dyn Error>>;
+#[async_trait]
+pub trait TimerDisplay: Send + Sync {
+    async fn run(&mut self) -> Result<(), Box<dyn Error>>;
 
-    fn split(&mut self);
+    async fn split(&mut self);
 
-    fn start(&mut self);
+    async fn start(&mut self);
 
-    fn pause(&mut self);
+    async fn pause(&mut self);
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("wlsplit")
         .arg(Arg::with_name("file").required(true).index(1))
         .arg(
@@ -47,12 +50,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let display = matches.value_of("display").unwrap();
     let mut app = get_app(display, timer);
-    app.run()?;
-    app.start();
-    loop {
-        app.run()?;
-    }
 
+
+    let app = Arc::new(Mutex::new(app));
+
+
+    let cloned = Arc::clone(&app);
+    tokio::spawn(async move {
+        loop {
+            cloned.lock().await.run().await.unwrap();
+        }
+    });
+
+    let cloned = Arc::clone(&app);
+    tokio::spawn(async move {
+        sleep(Duration::from_millis(600)).await;
+        cloned.lock().await.start().await;
+        sleep(Duration::from_millis(2000)).await;
+        cloned.lock().await.split().await;
+    });
+
+    loop {}
     Ok(())
 }
 
