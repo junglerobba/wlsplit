@@ -2,15 +2,16 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
     event::EnableMouseCapture, execute, terminal::enable_raw_mode, terminal::EnterAlternateScreen,
 };
+use tokio::sync::Mutex;
 
+use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
+use async_trait::async_trait;
 use livesplit_core::TimeSpan;
-use std::{convert::TryInto, error::Error};
+use std::{convert::TryInto, error::Error, sync::Arc};
 use std::{
     io::{stdout, Stdout, Write},
     process,
 };
-
-use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -34,11 +35,10 @@ const TIMEFORMAT: TimeFormat = TimeFormat {
 };
 
 pub struct App {
-    timer: WlSplitTimer,
+    timer: Arc<Mutex<WlSplitTimer>>,
     terminal: Terminal<CrosstermBackend<Stdout>>,
-    events: Events,
+    events: Arc<Mutex<Events>>,
 }
-
 impl App {
     pub fn new(timer: WlSplitTimer) -> Self {
         let mut stdout = stdout();
@@ -50,121 +50,117 @@ impl App {
         terminal.hide_cursor().unwrap();
 
         let events = Events::new(TICKRATE);
-        Self { timer, terminal, events }
+        Self {
+            timer: Arc::new(Mutex::new(timer)),
+            terminal,
+            events: Arc::new(Mutex::new(events)),
+        }
     }
 }
 
+#[async_trait]
 impl TimerDisplay for App {
-    fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    async fn run(&mut self) -> Result<(), Box<dyn Error>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
-        match self.events.next()? {
-            Event::Input(key) => {
-                if key == KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)
-                    || key == KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)
-                {
-                    process::exit(0);
-                }
+
+        let timer = self.timer.lock().await;
+        for (i, segment) in timer.segments().into_iter().enumerate() {
+            let mut row = Vec::new();
+            let index = timer.current_segment_index().unwrap_or(0);
+
+            // Segment
+            if i == index {
+                row.push(format!("> {}", segment.name().to_string()));
+            } else {
+                row.push(format!("  {}", segment.name().to_string()));
             }
-            Event::Tick => {
-                for (i, segment) in self.timer.segments().into_iter().enumerate() {
-                    let mut row = Vec::new();
-                    let index = self.timer.current_segment_index().unwrap_or(0);
 
-                    // Segment
-                    if i == index {
-                        row.push(format!("> {}", segment.name().to_string()));
-                    } else {
-                        row.push(format!("  {}", segment.name().to_string()));
-                    }
+            // Current
+            if i == index {
+                diff_time(
+                    timer.time(),
+                    segment.personal_best_split_time().real_time,
+                    &mut row,
+                );
+            } else if i < index {
+                diff_time(
+                    segment.split_time().real_time,
+                    timer.segments()[i].personal_best_split_time().real_time,
+                    &mut row,
+                );
+            } else {
+                row.push("".to_string());
+            }
 
-                    // Current
-                    if i == index {
-                        diff_time(
-                            self.timer.time(),
-                            segment.personal_best_split_time().real_time,
-                            &mut row,
-                        );
-                    } else if i < index {
-                        diff_time(
-                            segment.split_time().real_time,
-                            self.timer.segments()[i]
-                                .personal_best_split_time()
-                                .real_time,
-                            &mut row,
-                        );
-                    } else {
-                        row.push("".to_string());
-                    }
-
-                    // Best
-                    if let Some(time) = segment.personal_best_split_time().real_time {
-                        row.push(WlSplitTimer::format_time(
-                            time.to_duration().num_milliseconds().try_into().unwrap(),
-                            TIMEFORMAT,
-                            false,
-                        ));
-                    } else if i == index {
-                        if let Some(time) = self.timer.time() {
-                            row.push(WlSplitTimer::format_time(
-                                time.to_duration().num_milliseconds().try_into().unwrap(),
-                                TIMEFORMAT,
-                                false,
-                            ));
-                        }
-                    } else if i < index {
-                        if let Some(time) = segment.split_time().real_time {
-                            row.push(WlSplitTimer::format_time(
-                                time.to_duration().num_milliseconds().try_into().unwrap(),
-                                TIMEFORMAT,
-                                false,
-                            ));
-                        }
-                    } else {
-                        row.push("-:--:--.---".to_string());
-                    }
-
-                    rows.push(row);
-                }
-
-                if let Some(time) = self.timer.time() {
-                    let mut row = Vec::new();
-                    row.push("".to_string());
-                    row.push("".to_string());
+            // Best
+            if let Some(time) = segment.personal_best_split_time().real_time {
+                row.push(WlSplitTimer::format_time(
+                    time.to_duration().num_milliseconds().try_into().unwrap(),
+                    TIMEFORMAT,
+                    false,
+                ));
+            } else if i == index {
+                if let Some(time) = timer.time() {
                     row.push(WlSplitTimer::format_time(
                         time.to_duration().num_milliseconds().try_into().unwrap(),
                         TIMEFORMAT,
                         false,
                     ));
-                    rows.push(row);
                 }
-
-                let mut row = Vec::new();
-                row.push("".to_string());
-                row.push("Sum of best segments".to_string());
-                row.push(WlSplitTimer::format_time(
-                    self.timer.sum_of_best_segments() as u128,
-                    TIMEFORMAT,
-                    false,
-                ));
-                rows.push(row);
-
-                let mut row = Vec::new();
-                row.push("".to_string());
-                row.push("Best possible time".to_string());
-                row.push(WlSplitTimer::format_time(
-                    self.timer.best_possible_time() as u128,
-                    TIMEFORMAT,
-                    false,
-                ));
-                rows.push(row);
+            } else if i < index {
+                if let Some(time) = segment.split_time().real_time {
+                    row.push(WlSplitTimer::format_time(
+                        time.to_duration().num_milliseconds().try_into().unwrap(),
+                        TIMEFORMAT,
+                        false,
+                    ));
+                }
+            } else {
+                row.push("-:--:--.---".to_string());
             }
+
+            rows.push(row);
         }
+
+        if let Some(time) = timer.time() {
+            let mut row = Vec::new();
+            row.push("".to_string());
+            row.push("".to_string());
+            row.push(WlSplitTimer::format_time(
+                time.to_duration().num_milliseconds().try_into().unwrap(),
+                TIMEFORMAT,
+                false,
+            ));
+            rows.push(row);
+        }
+
+        let mut row = Vec::new();
+        row.push("".to_string());
+        row.push("Sum of best segments".to_string());
+        row.push(WlSplitTimer::format_time(
+            timer.sum_of_best_segments() as u128,
+            TIMEFORMAT,
+            false,
+        ));
+        rows.push(row);
+
+        let mut row = Vec::new();
+        row.push("".to_string());
+        row.push("Best possible time".to_string());
+        row.push(WlSplitTimer::format_time(
+            timer.best_possible_time() as u128,
+            TIMEFORMAT,
+            false,
+        ));
+        rows.push(row);
+
         let title = format!(
             "{} {} - {}",
-            self.timer.run().game_name(),
-            self.timer.run().category_name(),
-            self.timer.run().attempt_count()
+            timer.run().game_name(),
+            timer.run().category_name(),
+            timer.run().attempt_count()
         );
+
         self.terminal.draw(|f| {
             let rects = Layout::default()
                 .constraints([Constraint::Percentage(0)].as_ref())
@@ -191,16 +187,16 @@ impl TimerDisplay for App {
         Ok(())
     }
 
-    fn split(&mut self) {
-        self.timer.split();
+    async fn split(&mut self) {
+        self.timer.lock().await.split();
     }
 
-    fn start(&mut self) {
-        self.timer.start();
+    async fn start(&mut self) {
+        self.timer.lock().await.start();
     }
 
-    fn pause(&mut self) {
-        self.timer.pause();
+    async fn pause(&mut self) {
+        self.timer.lock().await.pause();
     }
 }
 
