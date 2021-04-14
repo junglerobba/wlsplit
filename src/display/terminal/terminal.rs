@@ -198,6 +198,10 @@ impl TimerDisplay for App {
     async fn pause(&mut self) {
         self.timer.lock().await.pause();
     }
+    
+    async fn reset(&mut self, update_splits: bool) {
+        self.timer.lock().await.reset(update_splits);
+    }
 }
 
 fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>, row: &mut Vec<String>) {
