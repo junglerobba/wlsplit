@@ -37,8 +37,7 @@ pub struct App {
 impl App {
     pub fn new(timer: WlSplitTimer) -> Self {
         let mut stdout = stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
-        enable_raw_mode().unwrap();
+        execute!(stdout, EnterAlternateScreen).unwrap();
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).unwrap();
