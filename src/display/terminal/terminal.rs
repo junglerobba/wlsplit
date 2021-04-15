@@ -23,10 +23,6 @@ use tui::{
     Terminal,
 };
 
-use super::{Event, Events};
-
-const TICKRATE: u64 = 10;
-
 const TIMEFORMAT: TimeFormat = TimeFormat {
     hours: 2,
     minutes: 2,
@@ -37,7 +33,6 @@ const TIMEFORMAT: TimeFormat = TimeFormat {
 pub struct App {
     timer: Arc<Mutex<WlSplitTimer>>,
     terminal: Terminal<CrosstermBackend<Stdout>>,
-    events: Arc<Mutex<Events>>,
 }
 impl App {
     pub fn new(timer: WlSplitTimer) -> Self {
@@ -49,11 +44,9 @@ impl App {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.hide_cursor().unwrap();
 
-        let events = Events::new(TICKRATE);
         Self {
             timer: Arc::new(Mutex::new(timer)),
             terminal,
-            events: Arc::new(Mutex::new(events)),
         }
     }
 }
