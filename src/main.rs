@@ -1,7 +1,7 @@
 use crate::display::TerminalApp;
 use async_trait::async_trait;
 use clap::{App, Arg};
-use std::{error::Error, sync::Arc, time::Duration};
+use std::{env, error::Error, sync::Arc, time::Duration};
 use std::{
     io::{BufRead, BufReader},
     os::unix::net::{UnixListener, UnixStream},
@@ -12,7 +12,7 @@ mod display;
 mod file;
 mod wl_split_timer;
 
-const SOCKET_PATH: &str = "/tmp/wlsplit.sock";
+const SOCKET_NAME: &str = "wlsplit.sock";
 
 #[async_trait]
 pub trait TimerDisplay: Send + Sync {
@@ -29,6 +29,11 @@ pub trait TimerDisplay: Send + Sync {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let socket_path = format!(
+        "{}/{}",
+        env::var("XDG_RUNTIME_DIR").unwrap_or("/tmp".to_string()),
+        SOCKET_NAME
+    );
     let matches = App::new("wlsplit")
         .arg(Arg::with_name("file").required(true).index(1))
         .arg(
@@ -48,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("socket")
                 .short("s")
                 .long("socket")
-                .default_value(SOCKET_PATH),
+                .default_value(&socket_path),
         )
         .get_matches();
 
