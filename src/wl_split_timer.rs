@@ -32,16 +32,19 @@ pub struct WlSplitTimer {
 }
 
 impl WlSplitTimer {
-    pub fn new(file: String, create_run: bool) -> Self {
+    pub fn new(file: String) -> Self {
         let mut run = Run::new();
 
-        if create_run {
-            let _run = RunFile::default();
-            file_to_run(_run, &mut run)
-        } else {
-            read_file(&file, &mut run).expect("Unable to parse file");
-        }
+        let generated = RunFile::default();
+        file_to_run(generated, &mut run);
+        let timer = Timer::new(run).unwrap();
 
+        Self { timer, file }
+    }
+
+    pub fn from_file(file: String) -> Self {
+        let mut run = Run::new();
+        read_file(&file, &mut run).expect("Unable to parse file");
         let timer = Timer::new(run).expect("At least one segment expected");
 
         Self { timer, file }
@@ -207,12 +210,12 @@ fn read_file(file: &String, run: &mut Run) -> Result<(), Box<dyn Error>> {
     file::read_json::<RunFile>(file).map(|json| file_to_run(json, run))
 }
 
-fn file_to_run(_run: RunFile, run: &mut Run) {
-    run.set_game_name(_run.game_name);
-    run.set_category_name(_run.category_name);
-    run.set_attempt_count(_run.attempt_count as u32);
+fn file_to_run(file: RunFile, run: &mut Run) {
+    run.set_game_name(file.game_name);
+    run.set_category_name(file.category_name);
+    run.set_attempt_count(file.attempt_count as u32);
 
-    for attempt in _run.attempt_history {
+    for attempt in file.attempt_history {
         let time = match attempt.time {
             Some(t) => t,
             _ => continue,
@@ -234,7 +237,7 @@ fn file_to_run(_run: RunFile, run: &mut Run) {
         run.add_attempt_with_index(time, attempt.id, started, ended, pause_time);
     }
 
-    for segment in _run.segments {
+    for segment in file.segments {
         let mut _segment = Segment::new(segment.name);
         if let Some(split_time) = segment.best_segment_time {
             if let Some(time) = split_time.time {

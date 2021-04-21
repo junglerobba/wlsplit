@@ -57,11 +57,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let socket = matches.value_of("socket").unwrap().to_string();
 
-    let timer = WlSplitTimer::new(input.to_string(), create_file);
-
     if create_file {
+        let timer = WlSplitTimer::new(input.to_string());
         return timer.write_file();
     }
+
+    let timer = WlSplitTimer::from_file(input.to_string());
 
     let display = matches.value_of("display").unwrap();
     let app = get_app(display, timer);
