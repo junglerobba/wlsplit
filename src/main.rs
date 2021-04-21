@@ -18,13 +18,7 @@ const SOCKET_NAME: &str = "wlsplit.sock";
 pub trait TimerDisplay: Send + Sync {
     async fn run(&mut self) -> Result<(), Box<dyn Error>>;
 
-    async fn split(&mut self);
-
-    async fn start(&mut self);
-
-    async fn pause(&mut self);
-
-    async fn reset(&mut self, update_splits: bool);
+    fn timer(&self) -> &Arc<Mutex<WlSplitTimer>>;
 }
 
 #[tokio::main]
@@ -70,50 +64,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let display = matches.value_of("display").unwrap();
-    let mut app = get_app(display, timer);
+    let app = get_app(display, timer);
 
     let app = Arc::new(Mutex::new(app));
+    let timer = Arc::clone(app.lock().await.timer());
 
-    let cloned = Arc::clone(&app);
-    tokio::spawn(async move {
-        loop {
-            cloned.lock().await.run().await.unwrap();
-            sleep(Duration::from_millis(33)).await;
-        }
-    });
-
-    std::fs::remove_file(&socket);
+    std::fs::remove_file(&socket).ok();
     tokio::spawn(async move {
         let listener = UnixListener::bind(&socket).unwrap();
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
-                let cloned = Arc::clone(&app);
-                handle_stream_response(cloned, stream).await;
+                handle_stream_response(&timer, stream).await;
             }
         }
     });
 
     loop {
-        sleep(Duration::from_secs(60)).await;
+        app.lock().await.run().await.unwrap();
+        sleep(Duration::from_millis(33)).await;
     }
-    Ok(())
 }
 
-async fn handle_stream_response(app: Arc<Mutex<Box<dyn TimerDisplay>>>, stream: UnixStream) {
+async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         match line.unwrap_or_default().as_str() {
             "start" => {
-                app.lock().await.start().await;
+                timer.lock().await.start();
             }
             "split" => {
-                app.lock().await.split().await;
+                timer.lock().await.split();
             }
             "pause" => {
-                app.lock().await.pause().await;
+                timer.lock().await.pause();
             }
             "reset" => {
-                app.lock().await.reset(true).await;
+                timer.lock().await.reset(true);
             }
             _ => {}
         }

@@ -153,6 +153,8 @@ impl TimerDisplay for App {
             timer.run().attempt_count()
         );
 
+        drop(timer);
+
         self.terminal.draw(|f| {
             let rects = Layout::default()
                 .constraints([Constraint::Percentage(0)].as_ref())
@@ -179,20 +181,8 @@ impl TimerDisplay for App {
         Ok(())
     }
 
-    async fn split(&mut self) {
-        self.timer.lock().await.split();
-    }
-
-    async fn start(&mut self) {
-        self.timer.lock().await.start();
-    }
-
-    async fn pause(&mut self) {
-        self.timer.lock().await.pause();
-    }
-    
-    async fn reset(&mut self, update_splits: bool) {
-        self.timer.lock().await.reset(update_splits);
+    fn timer(&self) -> &Arc<Mutex<WlSplitTimer>> {
+        &self.timer
     }
 }
 
