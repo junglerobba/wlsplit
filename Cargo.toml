@@ -3,6 +3,7 @@ name = "wlsplit"
 version = "0.1.0"
 authors = ["Tobias Langendorf <junglerobba@jngl.one>"]
 edition = "2018"
+default-run = "wlsplit"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,3 +21,11 @@ serde_json = "1.0"
 tokio = {version="1.0.1", features=["full"]}
 tokio-util = {version="0.6.0", features=["codec"]}
 async-trait = "0.1.42"
+
+[[bin]]
+name = "wlsplit"
+path = "src/main.rs"
+
+[[bin]]
+name = "wlsplitctl"
+path = "wlsplitctl/main.rs"
