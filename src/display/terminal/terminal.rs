@@ -1,17 +1,14 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
-    event::EnableMouseCapture, execute, terminal::enable_raw_mode, terminal::EnterAlternateScreen,
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use tokio::sync::Mutex;
 
 use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use async_trait::async_trait;
 use livesplit_core::TimeSpan;
+use std::io::{stdout, Stdout};
 use std::{convert::TryInto, error::Error, sync::Arc};
-use std::{
-    io::{stdout, Stdout, Write},
-    process,
-};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -48,14 +45,24 @@ impl App {
             terminal,
         }
     }
+
+    async fn quit(&mut self) {
+        execute!(stdout(), LeaveAlternateScreen).unwrap();
+        self.terminal.show_cursor().unwrap();
+    }
 }
 
 #[async_trait]
 impl TimerDisplay for App {
-    async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    async fn run(&mut self) -> Result<bool, Box<dyn Error>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
         let timer = self.timer.lock().await;
+        if timer.exit {
+            drop(timer);
+            self.quit().await;
+            return Ok(true);
+        }
         for (i, segment) in timer.segments().into_iter().enumerate() {
             let mut row = Vec::new();
             let index = timer.current_segment_index().unwrap_or(0);
@@ -178,7 +185,7 @@ impl TimerDisplay for App {
                 ]);
             f.render_stateful_widget(t, rects[0], &mut TableState::default());
         })?;
-        Ok(())
+        Ok(false)
     }
 
     fn timer(&self) -> &Arc<Mutex<WlSplitTimer>> {

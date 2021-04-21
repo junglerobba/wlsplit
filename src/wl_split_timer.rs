@@ -27,8 +27,9 @@ impl Default for TimeFormat {
 }
 
 pub struct WlSplitTimer {
-    pub timer: Timer,
+    timer: Timer,
     file: String,
+    pub exit: bool,
 }
 
 impl WlSplitTimer {
@@ -39,7 +40,11 @@ impl WlSplitTimer {
         file_to_run(generated, &mut run);
         let timer = Timer::new(run).unwrap();
 
-        Self { timer, file }
+        Self {
+            timer,
+            file,
+            exit: false,
+        }
     }
 
     pub fn from_file(file: String) -> Self {
@@ -47,7 +52,11 @@ impl WlSplitTimer {
         read_file(&file, &mut run).expect("Unable to parse file");
         let timer = Timer::new(run).expect("At least one segment expected");
 
-        Self { timer, file }
+        Self {
+            timer,
+            file,
+            exit: false,
+        }
     }
 
     pub fn run(&self) -> &Run {
@@ -76,12 +85,16 @@ impl WlSplitTimer {
 
         if end_of_run {
             self.reset(true);
-            self.write_file();
+            self.write_file().ok();
         }
     }
 
     pub fn reset(&mut self, update_splits: bool) {
         self.timer.reset(update_splits);
+    }
+
+    pub fn quit(&mut self) {
+        self.exit = true;
     }
 
     pub fn write_file(&self) -> Result<(), Box<dyn Error>> {

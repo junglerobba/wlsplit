@@ -16,7 +16,7 @@ const SOCKET_NAME: &str = "wlsplit.sock";
 
 #[async_trait]
 pub trait TimerDisplay: Send + Sync {
-    async fn run(&mut self) -> Result<(), Box<dyn Error>>;
+    async fn run(&mut self) -> Result<bool, Box<dyn Error>>;
 
     fn timer(&self) -> &Arc<Mutex<WlSplitTimer>>;
 }
@@ -71,22 +71,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let timer = Arc::clone(app.lock().await.timer());
 
     std::fs::remove_file(&socket).ok();
+    let listener = UnixListener::bind(&socket).unwrap();
     tokio::spawn(async move {
-        let listener = UnixListener::bind(&socket).unwrap();
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
-                handle_stream_response(&timer, stream).await;
+                if handle_stream_response(&timer, stream).await {
+                    break;
+                }
             }
         }
     });
 
     loop {
-        app.lock().await.run().await.unwrap();
+        if app.lock().await.run().await.unwrap_or(false) {
+            break;
+        }
         sleep(Duration::from_millis(33)).await;
     }
+    std::fs::remove_file(&socket).ok();
+    Ok(())
 }
 
-async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) {
+async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) -> bool {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         match line.unwrap_or_default().as_str() {
@@ -102,9 +108,14 @@ async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixSt
             "reset" => {
                 timer.lock().await.reset(true);
             }
+            "quit" => {
+                timer.lock().await.quit();
+                return true;
+            }
             _ => {}
         }
     }
+    return false;
 }
 
 fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {

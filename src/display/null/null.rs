@@ -17,8 +17,12 @@ impl App {
 
 #[async_trait]
 impl TimerDisplay for App {
-    async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        Ok(())
+    async fn run(&mut self) -> Result<bool, Box<dyn Error>> {
+        let timer = self.timer.lock().await;
+        if timer.exit {
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn timer(&self) -> &Arc<Mutex<WlSplitTimer>> {
