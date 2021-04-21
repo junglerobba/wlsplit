@@ -1,4 +1,4 @@
-use crate::display::TerminalApp;
+use crate::display::{Headless, TerminalApp};
 use async_trait::async_trait;
 use clap::{App, Arg};
 use std::{env, error::Error, sync::Arc, time::Duration};
@@ -109,6 +109,7 @@ async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixSt
 fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {
     match display {
         "terminal" => Box::new(TerminalApp::new(timer)),
+        "null" => Box::new(Headless::new(timer)),
         _ => {
             panic!("Unknown method");
         }
