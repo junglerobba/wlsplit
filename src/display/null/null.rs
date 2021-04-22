@@ -1,9 +1,9 @@
-use tokio::sync::Mutex;
-
 use crate::{wl_split_timer::WlSplitTimer, TimerDisplay};
-use async_trait::async_trait;
 
-use std::{error::Error, sync::Arc};
+use std::{
+    error::Error,
+    sync::{Arc, Mutex},
+};
 pub struct App {
     timer: Arc<Mutex<WlSplitTimer>>,
 }
@@ -15,10 +15,9 @@ impl App {
     }
 }
 
-#[async_trait]
 impl TimerDisplay for App {
-    async fn run(&mut self) -> Result<bool, Box<dyn Error>> {
-        let timer = self.timer.lock().await;
+    fn run(&mut self) -> Result<bool, Box<dyn Error>> {
+        let timer = self.timer.lock().unwrap();
         if timer.exit {
             return Ok(true);
         }

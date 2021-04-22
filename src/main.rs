@@ -1,12 +1,15 @@
 use crate::display::{Headless, TerminalApp};
-use async_trait::async_trait;
 use clap::{App, Arg};
-use std::{env, error::Error, sync::Arc, time::Duration};
+use std::{
+    env,
+    error::Error,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use std::{
     io::{BufRead, BufReader},
     os::unix::net::{UnixListener, UnixStream},
 };
-use tokio::{sync::Mutex, time::sleep};
 use wl_split_timer::WlSplitTimer;
 mod display;
 mod file;
@@ -14,15 +17,13 @@ mod wl_split_timer;
 
 const SOCKET_NAME: &str = "wlsplit.sock";
 
-#[async_trait]
-pub trait TimerDisplay: Send + Sync {
-    async fn run(&mut self) -> Result<bool, Box<dyn Error>>;
+pub trait TimerDisplay {
+    fn run(&mut self) -> Result<bool, Box<dyn Error>>;
 
     fn timer(&self) -> &Arc<Mutex<WlSplitTimer>>;
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let socket_path = format!(
         "{}/{}",
         env::var("XDG_RUNTIME_DIR").unwrap_or("/tmp".to_string()),
@@ -68,14 +69,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = get_app(display, timer);
 
     let app = Arc::new(Mutex::new(app));
-    let timer = Arc::clone(app.lock().await.timer());
+    let timer = Arc::clone(app.lock().unwrap().timer());
 
     std::fs::remove_file(&socket).ok();
     let listener = UnixListener::bind(&socket).unwrap();
-    tokio::spawn(async move {
+    std::thread::spawn(move || {
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
-                if handle_stream_response(&timer, stream).await {
+                if handle_stream_response(&timer, stream) {
                     break;
                 }
             }
@@ -83,33 +84,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     loop {
-        if app.lock().await.run().await.unwrap_or(false) {
+        if app.lock().unwrap().run().unwrap_or(false) {
             break;
         }
-        sleep(Duration::from_millis(33)).await;
+        std::thread::sleep(Duration::from_millis(33));
     }
     std::fs::remove_file(&socket).ok();
     Ok(())
 }
 
-async fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) -> bool {
+fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) -> bool {
     let stream = BufReader::new(stream);
     for line in stream.lines() {
         match line.unwrap_or_default().as_str() {
             "start" => {
-                timer.lock().await.start();
+                timer.lock().unwrap().start();
             }
             "split" => {
-                timer.lock().await.split();
+                timer.lock().unwrap().split();
             }
             "pause" => {
-                timer.lock().await.pause();
+                timer.lock().unwrap().pause();
             }
             "reset" => {
-                timer.lock().await.reset(true);
+                timer.lock().unwrap().reset(true);
             }
             "quit" => {
-                timer.lock().await.quit();
+                timer.lock().unwrap().quit();
                 return true;
             }
             _ => {}

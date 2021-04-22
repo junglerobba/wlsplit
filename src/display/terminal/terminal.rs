@@ -2,13 +2,11 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
-use tokio::sync::Mutex;
 
 use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
-use async_trait::async_trait;
 use livesplit_core::TimeSpan;
 use std::io::{stdout, Stdout};
-use std::{convert::TryInto, error::Error, sync::Arc};
+use std::{convert::TryInto, error::Error, sync::{Arc, Mutex}};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -46,21 +44,20 @@ impl App {
         }
     }
 
-    async fn quit(&mut self) {
+    fn quit(&mut self) {
         execute!(stdout(), LeaveAlternateScreen).unwrap();
         self.terminal.show_cursor().unwrap();
     }
 }
 
-#[async_trait]
 impl TimerDisplay for App {
-    async fn run(&mut self) -> Result<bool, Box<dyn Error>> {
+    fn run(&mut self) -> Result<bool, Box<dyn Error>> {
         let mut rows: Vec<Vec<String>> = Vec::new();
 
-        let timer = self.timer.lock().await;
+        let timer = self.timer.lock().unwrap();
         if timer.exit {
             drop(timer);
-            self.quit().await;
+            self.quit();
             return Ok(true);
         }
         for (i, segment) in timer.segments().into_iter().enumerate() {
