@@ -56,6 +56,10 @@ impl WlSplitTimer {
         }
     }
 
+    pub fn timer(&self) -> &Timer {
+        &self.timer
+    }
+
     pub fn run(&self) -> &Run {
         self.timer.run()
     }

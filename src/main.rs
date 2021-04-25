@@ -1,5 +1,5 @@
 use crate::{
-    display::{Headless, TerminalApp},
+    display::{Headless, TerminalApp, Wayland},
     wl_split_timer::RunMetadata,
 };
 use clap::{App, Arg};
@@ -20,7 +20,14 @@ mod file;
 mod time_format;
 mod wl_split_timer;
 
-const SOCKET_NAME: &str = "wlsplit.sock";
+#[macro_export]
+macro_rules! app_name {
+    () => {
+        "wlsplit"
+    };
+}
+
+const SOCKET_NAME: &str = concat!(app_name!(), ".sock");
 
 pub trait TimerDisplay {
     fn run(&mut self) -> Result<bool, Box<dyn Error>>;
@@ -40,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Arg::with_name("display")
                 .short("d")
                 .long("display")
-                .default_value("terminal"),
+                .default_value("wayland"),
         )
         .arg(
             Arg::with_name("create_file")
@@ -162,6 +169,7 @@ fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {
     match display {
         "terminal" => Box::new(TerminalApp::new(timer)),
         "null" => Box::new(Headless::new(timer)),
+        "wayland" => Box::new(Wayland::new(timer)),
         _ => {
             panic!("Unknown method");
         }
