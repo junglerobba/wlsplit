@@ -3,7 +3,7 @@ use std::{error::Error, fs::File, io::Read, io::Write};
 use livesplit_core::Run as LivesplitRun;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::wl_split_timer::{TimeFormat, WlSplitTimer};
+use crate::time_format::TimeFormat;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Run {
@@ -40,20 +40,15 @@ impl Run {
         for attempt in run.attempt_history() {
             if let Some(time) = attempt.time().real_time {
                 attempt_history.push(Attempt {
-                    time: Some(WlSplitTimer::format_time(
-                        time.total_milliseconds() as u128,
-                        TimeFormat::default(),
-                        false,
-                    )),
+                    time: Some(
+                        TimeFormat::for_file()
+                            .format_time(time.total_milliseconds() as u128, false),
+                    ),
                     id: attempt.index(),
                     started: attempt.started().map(|t| t.time.to_rfc3339()),
                     ended: attempt.ended().map(|t| t.time.to_rfc3339()),
                     pause_time: attempt.pause_time().map(|t| {
-                        WlSplitTimer::format_time(
-                            t.total_milliseconds() as u128,
-                            TimeFormat::default(),
-                            false,
-                        )
+                        TimeFormat::for_file().format_time(t.total_milliseconds() as u128, false)
                     }),
                 });
             }
@@ -64,11 +59,9 @@ impl Run {
             let best_segment_time = segment.best_segment_time().real_time.map(|t| SplitTime {
                 id: None,
                 name: None,
-                time: Some(WlSplitTimer::format_time(
-                    t.total_milliseconds() as u128,
-                    TimeFormat::default(),
-                    false,
-                )),
+                time: Some(
+                    TimeFormat::for_file().format_time(t.total_milliseconds() as u128, false),
+                ),
             });
 
             let mut split_times: Vec<SplitTime> = Vec::new();
@@ -76,11 +69,10 @@ impl Run {
                 split_times.push(SplitTime {
                     id: None,
                     name: Some("Personal Best".to_string()),
-                    time: Some(WlSplitTimer::format_time(
-                        time.total_milliseconds() as u128,
-                        TimeFormat::default(),
-                        false,
-                    )),
+                    time: Some(
+                        TimeFormat::for_file()
+                            .format_time(time.total_milliseconds() as u128, false),
+                    ),
                 })
             };
 
@@ -97,11 +89,10 @@ impl Run {
                     _segment.segment_history.push(SplitTime {
                         id: Some(history.0),
                         name: None,
-                        time: Some(WlSplitTimer::format_time(
-                            time.total_milliseconds() as u128,
-                            TimeFormat::default(),
-                            false,
-                        )),
+                        time: Some(
+                            TimeFormat::for_file()
+                                .format_time(time.total_milliseconds() as u128, false),
+                        ),
                     });
                 }
             }

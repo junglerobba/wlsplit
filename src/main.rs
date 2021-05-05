@@ -13,6 +13,7 @@ use std::{
 use wl_split_timer::WlSplitTimer;
 mod display;
 mod file;
+mod time_format;
 mod wl_split_timer;
 
 const SOCKET_NAME: &str = "wlsplit.sock";

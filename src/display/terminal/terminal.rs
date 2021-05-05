@@ -3,10 +3,14 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-use crate::{wl_split_timer::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
+use crate::{time_format::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 use livesplit_core::TimeSpan;
 use std::io::{stdout, Stdout};
-use std::{convert::TryInto, error::Error, sync::{Arc, Mutex}};
+use std::{
+    convert::TryInto,
+    error::Error,
+    sync::{Arc, Mutex},
+};
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
@@ -16,13 +20,6 @@ use tui::{
     widgets::TableState,
     widgets::{Block, Borders},
     Terminal,
-};
-
-const TIMEFORMAT: TimeFormat = TimeFormat {
-    hours: 2,
-    minutes: 2,
-    seconds: 2,
-    msecs: 3,
 };
 
 pub struct App {
@@ -90,24 +87,21 @@ impl TimerDisplay for App {
 
             // Best
             if let Some(time) = segment.personal_best_split_time().real_time {
-                row.push(WlSplitTimer::format_time(
+                row.push(TimeFormat::default().format_time(
                     time.to_duration().num_milliseconds().try_into().unwrap(),
-                    TIMEFORMAT,
                     false,
                 ));
             } else if i == index {
                 if let Some(time) = timer.time() {
-                    row.push(WlSplitTimer::format_time(
+                    row.push(TimeFormat::default().format_time(
                         time.to_duration().num_milliseconds().try_into().unwrap(),
-                        TIMEFORMAT,
                         false,
                     ));
                 }
             } else if i < index {
                 if let Some(time) = segment.split_time().real_time {
-                    row.push(WlSplitTimer::format_time(
+                    row.push(TimeFormat::default().format_time(
                         time.to_duration().num_milliseconds().try_into().unwrap(),
-                        TIMEFORMAT,
                         false,
                     ));
                 }
@@ -122,9 +116,8 @@ impl TimerDisplay for App {
             let mut row = Vec::new();
             row.push("".to_string());
             row.push("".to_string());
-            row.push(WlSplitTimer::format_time(
+            row.push(TimeFormat::default().format_time(
                 time.to_duration().num_milliseconds().try_into().unwrap(),
-                TIMEFORMAT,
                 false,
             ));
             rows.push(row);
@@ -133,21 +126,13 @@ impl TimerDisplay for App {
         let mut row = Vec::new();
         row.push("".to_string());
         row.push("Sum of best segments".to_string());
-        row.push(WlSplitTimer::format_time(
-            timer.sum_of_best_segments() as u128,
-            TIMEFORMAT,
-            false,
-        ));
+        row.push(TimeFormat::default().format_time(timer.sum_of_best_segments() as u128, false));
         rows.push(row);
 
         let mut row = Vec::new();
         row.push("".to_string());
         row.push("Best possible time".to_string());
-        row.push(WlSplitTimer::format_time(
-            timer.best_possible_time() as u128,
-            TIMEFORMAT,
-            false,
-        ));
+        row.push(TimeFormat::default().format_time(timer.best_possible_time() as u128, false));
         rows.push(row);
 
         let title = format!(
@@ -203,7 +188,7 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>, row: &mut Vec<Strin
             negative = false;
             diff = time - best;
         }
-        row.push(WlSplitTimer::format_time(diff, TIMEFORMAT, negative));
+        row.push(TimeFormat::for_diff().format_time(diff, negative));
     } else {
         row.push("".to_string());
     }

@@ -8,24 +8,6 @@ const MSEC_HOUR: u128 = 3600000;
 const MSEC_MINUTE: u128 = 60000;
 const MSEC_SECOND: u128 = 1000;
 
-pub struct TimeFormat {
-    pub hours: usize,
-    pub minutes: usize,
-    pub seconds: usize,
-    pub msecs: usize,
-}
-
-impl Default for TimeFormat {
-    fn default() -> Self {
-        Self {
-            hours: 2,
-            minutes: 2,
-            seconds: 2,
-            msecs: 3,
-        }
-    }
-}
-
 pub struct WlSplitTimer {
     timer: Timer,
     file: String,
@@ -162,26 +144,6 @@ impl WlSplitTimer {
         time
     }
 
-    pub fn format_time(time: u128, format: TimeFormat, negative: bool) -> String {
-        let prefix = if negative { "-" } else { "" };
-        let mut time = time;
-        let hours = time / MSEC_HOUR;
-        time -= hours * MSEC_HOUR;
-        let minutes = time / MSEC_MINUTE;
-        time -= minutes * MSEC_MINUTE;
-        let seconds = time / MSEC_SECOND;
-        time -= seconds * MSEC_SECOND;
-
-        format!(
-            "{}{}:{}:{}.{}",
-            prefix,
-            pad_zeroes(hours, format.hours),
-            pad_zeroes(minutes, format.minutes),
-            pad_zeroes(seconds, format.seconds),
-            pad_zeroes(time, format.msecs),
-        )
-    }
-
     pub fn parse_time_string(time: String) -> u128 {
         let split = time.split(":");
         let mut time: u128 = 0;
@@ -207,16 +169,6 @@ impl WlSplitTimer {
         let time: Time = Time::new();
         time.with_real_time(Some(time_span))
     }
-}
-
-fn pad_zeroes(time: u128, length: usize) -> String {
-    let str_length = time.to_string().chars().count();
-    if str_length >= length {
-        return format!("{}", time);
-    }
-    let count = length - str_length;
-    let zeroes = "0".repeat(count);
-    format!("{}{}", zeroes, time)
 }
 
 fn read_file(file: &String, run: &mut Run) -> Result<(), Box<dyn Error>> {
