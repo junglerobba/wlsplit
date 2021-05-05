@@ -147,7 +147,7 @@ impl TimerDisplay for App {
         self.terminal.draw(|f| {
             let rects = Layout::default()
                 .constraints([Constraint::Percentage(0)].as_ref())
-                .margin(5)
+                .margin(0)
                 .split(f.size());
 
             let selected_style = Style::default()
@@ -157,7 +157,7 @@ impl TimerDisplay for App {
             let header = ["Segment", "Current", "Best"];
             let rows = rows.iter().map(|i| Row::StyledData(i.iter(), normal_style));
             let t = Table::new(header.iter(), rows)
-                .block(Block::default().borders(Borders::ALL).title(title))
+                .block(Block::default().borders(Borders::NONE).title(title))
                 .highlight_style(selected_style)
                 .highlight_symbol(">> ")
                 .widths(&[
