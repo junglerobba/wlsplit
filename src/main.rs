@@ -104,6 +104,9 @@ fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) 
             "split" => {
                 timer.lock().unwrap().split();
             }
+            "skip" => {
+                timer.lock().unwrap().skip();
+            }
             "pause" => {
                 timer.lock().unwrap().pause();
             }

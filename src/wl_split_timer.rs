@@ -71,6 +71,10 @@ impl WlSplitTimer {
         }
     }
 
+    pub fn skip(&mut self) {
+        self.timer.skip_split();
+    }
+
     pub fn reset(&mut self, update_splits: bool) {
         self.timer.reset(update_splits);
         if update_splits {
