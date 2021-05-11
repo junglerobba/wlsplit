@@ -108,6 +108,31 @@ impl Run {
             segments: segments,
         }
     }
+
+    pub fn with_game_name(mut self, game_name: &str) -> Self {
+        self.game_name = game_name.to_string();
+        self
+    }
+
+    pub fn with_category_name(mut self, category_name: &str) -> Self {
+        self.category_name = category_name.to_string();
+        self
+    }
+
+    pub fn with_splits(mut self, splits: Vec<&str>) -> Self {
+        let mut segments: Vec<Segment> = Vec::new();
+        for split in splits {
+            segments.push(Segment {
+                name: split.to_string(),
+                icon: None,
+                segment_history: Vec::new(),
+                split_times: Vec::new(),
+                best_segment_time: None,
+            });
+        }
+        self.segments = segments;
+        self
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

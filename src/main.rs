@@ -1,4 +1,7 @@
-use crate::display::{Headless, TerminalApp};
+use crate::{
+    display::{Headless, TerminalApp},
+    wl_split_timer::RunMetadata,
+};
 use clap::{App, Arg};
 use std::{
     env,
@@ -46,6 +49,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .takes_value(false),
         )
         .arg(
+            Arg::with_name("game_name")
+                .long_help("Game name to use when generating run file")
+                .long("game")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("category_name")
+                .long_help("Category name to use when generating run file")
+                .long("category")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("splits")
+                .long_help("Comma separated list of splits to use when generating run file")
+                .long("splits")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("socket")
                 .short("s")
                 .long("socket")
@@ -59,12 +83,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let socket = matches.value_of("socket").unwrap().to_string();
 
-    if create_file {
-        let timer = WlSplitTimer::new(input.to_string());
-        return timer.write_file();
-    }
-
-    let timer = WlSplitTimer::from_file(input.to_string());
+    let timer = if create_file {
+        let metadata = RunMetadata {
+            game_name: matches.value_of("game_name"),
+            category_name: matches.value_of("category_name"),
+            splits: matches
+                .value_of("splits")
+                .map(|split_names| split_names.split(',').collect()),
+        };
+        WlSplitTimer::new(input.to_string(), metadata)
+    } else {
+        WlSplitTimer::from_file(input.to_string())
+    };
 
     let display = matches.value_of("display").unwrap();
     let app = get_app(display, timer);

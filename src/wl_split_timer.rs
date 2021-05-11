@@ -8,6 +8,11 @@ const MSEC_HOUR: u128 = 3600000;
 const MSEC_MINUTE: u128 = 60000;
 const MSEC_SECOND: u128 = 1000;
 
+pub struct RunMetadata<'a> {
+    pub game_name: Option<&'a str>,
+    pub category_name: Option<&'a str>,
+    pub splits: Option<Vec<&'a str>>,
+}
 pub struct WlSplitTimer {
     timer: Timer,
     file: String,
@@ -15,10 +20,19 @@ pub struct WlSplitTimer {
 }
 
 impl WlSplitTimer {
-    pub fn new(file: String) -> Self {
+    pub fn new(file: String, metadata: RunMetadata) -> Self {
         let mut run = Run::new();
 
-        let generated = RunFile::default();
+        let mut generated = RunFile::default();
+        if let Some(game_name) = metadata.game_name {
+            generated = generated.with_game_name(game_name);
+        }
+        if let Some(category_name) = metadata.category_name {
+            generated = generated.with_category_name(category_name);
+        }
+        if let Some(splits) = metadata.splits {
+            generated = generated.with_splits(splits);
+        }
         file_to_run(generated, &mut run);
         let timer = Timer::new(run).unwrap();
 
