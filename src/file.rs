@@ -76,28 +76,25 @@ impl Run {
                 })
             };
 
-            let mut _segment = Segment {
+            let segment_history: Vec<SplitTime> = segment
+                .segment_history()
+                .iter()
+                .map(|entry| SplitTime {
+                    id: Some(entry.0),
+                    name: None,
+                    time: entry.1.real_time.map(|time| {
+                        TimeFormat::for_file().format_time(time.total_milliseconds() as u128, false)
+                    }),
+                })
+                .collect();
+
+            segments.push(Segment {
                 name: segment.name().to_string(),
                 icon: None,
-                segment_history: Vec::new(),
+                segment_history,
                 split_times,
                 best_segment_time,
-            };
-
-            for history in segment.segment_history() {
-                if let Some(time) = history.1.real_time {
-                    _segment.segment_history.push(SplitTime {
-                        id: Some(history.0),
-                        name: None,
-                        time: Some(
-                            TimeFormat::for_file()
-                                .format_time(time.total_milliseconds() as u128, false),
-                        ),
-                    });
-                }
-            }
-
-            segments.push(_segment);
+            });
         }
 
         Self {

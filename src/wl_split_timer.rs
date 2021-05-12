@@ -245,10 +245,11 @@ fn file_to_run(file: RunFile, run: &mut Run) {
         }
 
         for split in segment.segment_history {
-            if let (Some(time), Some(id)) = (split.time, split.id) {
-                _segment
-                    .segment_history_mut()
-                    .insert(id, WlSplitTimer::string_to_time(time));
+            if let Some(id) = split.id {
+                _segment.segment_history_mut().insert(
+                    id,
+                    split.time.map_or(Time::new(), WlSplitTimer::string_to_time),
+                )
             }
         }
 
