@@ -112,11 +112,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     std::fs::remove_file(&socket).ok();
     let listener = UnixListener::bind(&socket).unwrap();
     std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            if let Ok(stream) = stream {
-                if handle_stream_response(&timer, stream) {
-                    break;
-                }
+        for stream in listener.incoming().flatten() {
+            if handle_stream_response(&timer, stream) {
+                break;
             }
         }
     });
@@ -157,7 +155,7 @@ fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) 
             _ => {}
         }
     }
-    return false;
+    false
 }
 
 fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {

@@ -29,7 +29,7 @@ impl Default for Run {
             category_name: "Any%".to_string(),
             attempt_count: 0,
             attempt_history: Vec::new(),
-            segments: segments,
+            segments,
         }
     }
 }
@@ -80,8 +80,8 @@ impl Run {
                 name: segment.name().to_string(),
                 icon: None,
                 segment_history: Vec::new(),
-                split_times: split_times,
-                best_segment_time: best_segment_time,
+                split_times,
+                best_segment_time,
             };
 
             for history in segment.segment_history() {
@@ -104,8 +104,8 @@ impl Run {
             game_name: run.game_name().to_string(),
             category_name: run.category_name().to_string(),
             attempt_count: run.attempt_count() as usize,
-            attempt_history: attempt_history,
-            segments: segments,
+            attempt_history,
+            segments,
         }
     }
 
@@ -160,7 +160,7 @@ pub struct Segment {
     pub segment_history: Vec<SplitTime>,
 }
 
-pub fn read_json<T: DeserializeOwned>(path: &String) -> Result<T, Box<dyn Error>> {
+pub fn read_json<T: DeserializeOwned>(path: &str) -> Result<T, Box<dyn Error>> {
     let mut file = File::open(path)?;
     let mut content = String::new();
     file.read_to_string(&mut content)?;
@@ -169,9 +169,8 @@ pub fn read_json<T: DeserializeOwned>(path: &String) -> Result<T, Box<dyn Error>
     Ok(result)
 }
 
-pub fn write_json<T: Serialize>(path: &String, data: T) -> Result<(), Box<dyn Error>> {
+pub fn write_json<T: Serialize>(path: &str, data: T) -> Result<(), Box<dyn Error>> {
     let serialized = serde_json::to_string_pretty(&data)?;
-    let path = format!("{}", path);
     let mut file = File::create(path)?;
     file.write_all(serialized.as_bytes())?;
 

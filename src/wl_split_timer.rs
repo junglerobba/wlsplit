@@ -154,7 +154,7 @@ impl WlSplitTimer {
             .unwrap_or_default()
             .total_milliseconds() as usize;
 
-        for segment in self.run().segments().into_iter().skip(index) {
+        for segment in self.run().segments().iter().skip(index) {
             let segment = segment
                 .best_segment_time()
                 .real_time
@@ -195,7 +195,7 @@ impl WlSplitTimer {
     }
 }
 
-fn read_file(file: &String, run: &mut Run) -> Result<(), Box<dyn Error>> {
+fn read_file(file: &str, run: &mut Run) -> Result<(), Box<dyn Error>> {
     file::read_json::<RunFile>(file).map(|json| file_to_run(json, run))
 }
 
@@ -248,7 +248,7 @@ fn file_to_run(file: RunFile, run: &mut Run) {
             if let (Some(time), Some(id)) = (split.time, split.id) {
                 _segment
                     .segment_history_mut()
-                    .insert(id, WlSplitTimer::string_to_time(time.to_string()));
+                    .insert(id, WlSplitTimer::string_to_time(time));
             }
         }
 
@@ -256,7 +256,7 @@ fn file_to_run(file: RunFile, run: &mut Run) {
     }
 }
 
-fn write_file(file: &String, run: &Run) -> Result<(), Box<dyn Error>> {
+fn write_file(file: &str, run: &Run) -> Result<(), Box<dyn Error>> {
     let run = RunFile::new(&run);
     file::write_json(file, run)
 }

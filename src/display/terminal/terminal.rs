@@ -57,7 +57,7 @@ impl TimerDisplay for App {
             self.quit();
             return Ok(true);
         }
-        for (i, segment) in timer.segments().into_iter().enumerate() {
+        for (i, segment) in timer.segments().iter().enumerate() {
             let mut row = Vec::new();
             let index = timer.current_segment_index().unwrap_or(0);
 
@@ -113,27 +113,27 @@ impl TimerDisplay for App {
         }
 
         if let Some(time) = timer.time() {
-            let mut row = Vec::new();
-            row.push("".to_string());
-            row.push("".to_string());
-            row.push(TimeFormat::default().format_time(
-                time.to_duration().num_milliseconds().try_into().unwrap(),
-                false,
-            ));
-            rows.push(row);
+            rows.push(vec![
+                "".to_string(),
+                "".to_string(),
+                TimeFormat::default().format_time(
+                    time.to_duration().num_milliseconds().try_into().unwrap(),
+                    false,
+                ),
+            ]);
         }
 
-        let mut row = Vec::new();
-        row.push("".to_string());
-        row.push("Sum of best segments".to_string());
-        row.push(TimeFormat::default().format_time(timer.sum_of_best_segments() as u128, false));
-        rows.push(row);
+        rows.push(vec![
+            "".to_string(),
+            "Sum of best segments".to_string(),
+            TimeFormat::default().format_time(timer.sum_of_best_segments() as u128, false),
+        ]);
 
-        let mut row = Vec::new();
-        row.push("".to_string());
-        row.push("Best possible time".to_string());
-        row.push(TimeFormat::default().format_time(timer.best_possible_time() as u128, false));
-        rows.push(row);
+        rows.push(vec![
+            "".to_string(),
+            "Best possible time".to_string(),
+            TimeFormat::default().format_time(timer.best_possible_time() as u128, false),
+        ]);
 
         let title = format!(
             "{} {} - {}",

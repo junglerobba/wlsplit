@@ -13,22 +13,20 @@ pub struct TimeFormat {
 
 impl TimeFormat {
     pub fn for_diff() -> Self {
-        let mut format = TimeFormat::default();
-        format.always_prefix = true;
-        format
+        TimeFormat {
+            always_prefix: true,
+            ..Default::default()
+        }
     }
 
     pub fn for_file() -> Self {
-        let mut format = TimeFormat::default();
-        format.allow_shorten = false;
-        format
+        TimeFormat {
+            allow_shorten: false,
+            ..Default::default()
+        }
     }
 
-    pub fn format_time(
-		&self,
-        time: u128,
-        negative: bool,
-    ) -> String {
+    pub fn format_time(&self, time: u128, negative: bool) -> String {
         let prefix = if negative {
             "-"
         } else if self.always_prefix {
