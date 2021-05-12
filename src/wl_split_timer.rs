@@ -166,30 +166,32 @@ impl WlSplitTimer {
         time
     }
 
-    pub fn parse_time_string(time: String) -> u128 {
-        let split = time.split(":");
+    pub fn parse_time_string(time: String) -> Result<u128, Box<dyn Error>> {
+        let split: Vec<&str> = time.split(':').collect();
         let mut time: u128 = 0;
-        let vec: Vec<&str> = split.collect();
+        time += MSEC_HOUR * split.get(0).ok_or("")?.parse::<u128>()?;
+        time += MSEC_MINUTE * split.get(1).ok_or("")?.parse::<u128>()?;
 
-        time += MSEC_HOUR * vec[0].parse::<u128>().unwrap_or(0);
-        time += MSEC_MINUTE * vec[1].parse::<u128>().unwrap_or(0);
+        let split: Vec<&str> = split.get(2).ok_or("")?.split('.').collect();
 
-        let split = vec[2].split(".");
-        let vec: Vec<&str> = split.collect();
+        time += MSEC_SECOND * split.get(0).ok_or("")?.parse::<u128>()?;
+        time += split
+            .get(1)
+            .ok_or("")?
+            .chars()
+            .take(3)
+            .collect::<String>()
+            .parse::<u128>()?;
 
-        time += MSEC_SECOND * vec[0].parse::<u128>().unwrap_or(0);
-        let msecs: String = vec[1].chars().take(3).collect();
-        time += msecs.parse::<u128>().unwrap_or(0);
-
-        time
+        Ok(time)
     }
 
     pub fn string_to_time(string: String) -> Time {
-        let time = WlSplitTimer::parse_time_string(string) as f64;
-        let time_span = TimeSpan::from_milliseconds(time);
+        let time = WlSplitTimer::parse_time_string(string)
+            .map(|time| TimeSpan::from_milliseconds(time as f64))
+            .expect("Unable to parse time");
 
-        let time: Time = Time::new();
-        time.with_real_time(Some(time_span))
+        Time::new().with_real_time(Some(time))
     }
 }
 
@@ -218,9 +220,11 @@ fn file_to_run(file: RunFile, run: &mut Run) {
                 .map(|t| AtomicDateTime::new(t.with_timezone(&Utc), false))
                 .ok()
         });
-        let pause_time = attempt
-            .pause_time
-            .map(|t| TimeSpan::from_milliseconds(WlSplitTimer::parse_time_string(t) as f64));
+        let pause_time = attempt.pause_time.and_then(|time| {
+            WlSplitTimer::parse_time_string(time)
+                .map(|ms| TimeSpan::from_milliseconds(ms as f64))
+                .ok()
+        });
         run.add_attempt_with_index(time, attempt.id, started, ended, pause_time);
     }
 
