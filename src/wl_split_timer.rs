@@ -34,6 +34,7 @@ impl WlSplitTimer {
             generated = generated.with_splits(splits);
         }
         file_to_run(generated, &mut run);
+        write_file(&file, &run).expect("Could not write file");
         let timer = Timer::new(run).unwrap();
 
         Self {

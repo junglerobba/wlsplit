@@ -6,6 +6,7 @@ use clap::{App, Arg};
 use std::{
     env,
     error::Error,
+    fs::OpenOptions,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -43,8 +44,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("create_file")
-                .short("c")
+                .short("f")
                 .long("create-file")
+                .long_help("Creates a new file regardless if a file already exists in that location or not")
                 .required(false)
                 .takes_value(false),
         )
@@ -79,7 +81,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let input = matches.value_of("file").expect("Input file required!");
 
-    let create_file = matches.is_present("create_file");
+    let create_file = matches.is_present("create_file")
+        || OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(input)
+            .is_ok();
 
     let socket = matches.value_of("socket").unwrap().to_string();
 
