@@ -229,31 +229,27 @@ fn file_to_run(file: RunFile, run: &mut Run) {
     }
 
     for segment in file.segments {
-        let mut _segment = Segment::new(segment.name);
-        if let Some(split_time) = segment.best_segment_time {
-            if let Some(time) = split_time.time {
-                _segment.set_best_segment_time(WlSplitTimer::string_to_time(time));
-            }
-        }
+        let best_segment_time = segment
+            .best_segment_time
+            .map_or(Time::new(), WlSplitTimer::string_to_time);
+        let personal_best_split_time = segment
+            .personal_best_split_time
+            .map_or(Time::new(), WlSplitTimer::string_to_time);
 
-        for split in segment.split_times {
-            if let (Some(time), Some(name)) = (split.time, split.name) {
-                if name == "Personal Best" {
-                    _segment.set_personal_best_split_time(WlSplitTimer::string_to_time(time));
-                }
-            }
-        }
+        let mut segment_new = Segment::new(segment.name);
+        segment_new.set_best_segment_time(best_segment_time);
+        segment_new.set_personal_best_split_time(personal_best_split_time);
 
         for split in segment.segment_history {
             if let Some(id) = split.id {
-                _segment.segment_history_mut().insert(
+                segment_new.segment_history_mut().insert(
                     id,
                     split.time.map_or(Time::new(), WlSplitTimer::string_to_time),
                 )
             }
         }
 
-        run.push_segment(_segment);
+        run.push_segment(segment_new);
     }
 }
 

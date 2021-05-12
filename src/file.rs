@@ -18,10 +18,7 @@ impl Default for Run {
     fn default() -> Self {
         let segments = vec![Segment {
             name: "Example Segment".to_string(),
-            icon: None,
-            segment_history: Vec::new(),
-            split_times: Vec::new(),
-            best_segment_time: None,
+            ..Default::default()
         }];
 
         Self {
@@ -56,32 +53,20 @@ impl Run {
 
         let mut segments: Vec<Segment> = Vec::new();
         for segment in run.segments() {
-            let best_segment_time = segment.best_segment_time().real_time.map(|t| SplitTime {
-                id: None,
-                name: None,
-                time: Some(
-                    TimeFormat::for_file().format_time(t.total_milliseconds() as u128, false),
-                ),
+            let best_segment_time = segment.best_segment_time().real_time.map(|time| {
+                TimeFormat::for_file().format_time(time.total_milliseconds() as u128, false)
             });
 
-            let mut split_times: Vec<SplitTime> = Vec::new();
-            if let Some(time) = segment.personal_best_split_time().real_time {
-                split_times.push(SplitTime {
-                    id: None,
-                    name: Some("Personal Best".to_string()),
-                    time: Some(
-                        TimeFormat::for_file()
-                            .format_time(time.total_milliseconds() as u128, false),
-                    ),
-                })
-            };
+            let personal_best_split_time =
+                segment.personal_best_split_time().real_time.map(|time| {
+                    TimeFormat::for_file().format_time(time.total_milliseconds() as u128, false)
+                });
 
             let segment_history: Vec<SplitTime> = segment
                 .segment_history()
                 .iter()
                 .map(|entry| SplitTime {
                     id: Some(entry.0),
-                    name: None,
                     time: entry.1.real_time.map(|time| {
                         TimeFormat::for_file().format_time(time.total_milliseconds() as u128, false)
                     }),
@@ -90,9 +75,8 @@ impl Run {
 
             segments.push(Segment {
                 name: segment.name().to_string(),
-                icon: None,
                 segment_history,
-                split_times,
+                personal_best_split_time,
                 best_segment_time,
             });
         }
@@ -117,17 +101,13 @@ impl Run {
     }
 
     pub fn with_splits(mut self, splits: Vec<&str>) -> Self {
-        let mut segments: Vec<Segment> = Vec::new();
-        for split in splits {
-            segments.push(Segment {
+        self.segments = splits
+            .iter()
+            .map(|split| Segment {
                 name: split.to_string(),
-                icon: None,
-                segment_history: Vec::new(),
-                split_times: Vec::new(),
-                best_segment_time: None,
-            });
-        }
-        self.segments = segments;
+                ..Default::default()
+            })
+            .collect();
         self
     }
 }
@@ -143,17 +123,15 @@ pub struct Attempt {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct SplitTime {
-    pub name: Option<String>,
     pub time: Option<String>,
     pub id: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct Segment {
     pub name: String,
-    pub icon: Option<String>,
-    pub split_times: Vec<SplitTime>,
-    pub best_segment_time: Option<SplitTime>,
+    pub personal_best_split_time: Option<String>,
+    pub best_segment_time: Option<String>,
     pub segment_history: Vec<SplitTime>,
 }
 
