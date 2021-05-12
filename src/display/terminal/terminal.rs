@@ -69,45 +69,28 @@ impl TimerDisplay for App {
             }
 
             // Current
-            if i == index {
-                diff_time(
-                    timer.time(),
-                    segment.personal_best_split_time().real_time,
-                    &mut row,
-                );
-            } else if i < index {
-                diff_time(
+            row.push(match i.cmp(&index) {
+                std::cmp::Ordering::Equal => {
+                    diff_time(timer.time(), segment.personal_best_split_time().real_time)
+                }
+                std::cmp::Ordering::Less => diff_time(
                     segment.split_time().real_time,
                     timer.segments()[i].personal_best_split_time().real_time,
-                    &mut row,
-                );
-            } else {
-                row.push("".to_string());
-            }
+                ),
+                _ => "".to_string(),
+            });
 
-            // Best
-            if let Some(time) = segment.personal_best_split_time().real_time {
-                row.push(TimeFormat::default().format_time(
-                    time.to_duration().num_milliseconds().try_into().unwrap(),
-                    false,
-                ));
-            } else if i == index {
-                if let Some(time) = timer.time() {
-                    row.push(TimeFormat::default().format_time(
-                        time.to_duration().num_milliseconds().try_into().unwrap(),
-                        false,
-                    ));
-                }
-            } else if i < index {
-                if let Some(time) = segment.split_time().real_time {
-                    row.push(TimeFormat::default().format_time(
-                        time.to_duration().num_milliseconds().try_into().unwrap(),
-                        false,
-                    ));
-                }
+            let time = if let Some(time) = segment.personal_best_split_time().real_time {
+                Some(time)
+            } else if segment.segment_history().iter().len() == 0 {
+                segment.split_time().real_time
             } else {
-                row.push("-:--:--.---".to_string());
-            }
+                None
+            };
+            row.push(time.map_or("-:--:--.---".to_string(), |time| {
+                TimeFormat::default()
+                    .format_time(time.to_duration().num_milliseconds() as u128, false)
+            }));
 
             rows.push(row);
         }
@@ -174,22 +157,13 @@ impl TimerDisplay for App {
         &self.timer
     }
 }
-
-fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>, row: &mut Vec<String>) {
+fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>) -> String {
     if let (Some(time), Some(best)) = (time, best) {
-        let negative: bool;
-        let diff: u128;
-        let time = time.to_duration().num_milliseconds() as u128;
-        let best = best.to_duration().num_milliseconds() as u128;
-        if best > time {
-            negative = true;
-            diff = best - time;
-        } else {
-            negative = false;
-            diff = time - best;
-        }
-        row.push(TimeFormat::for_diff().format_time(diff, negative));
-    } else {
-        row.push("".to_string());
+        let time = time.to_duration().num_milliseconds();
+        let best = best.to_duration().num_milliseconds();
+        let negative = best > time;
+        let diff = if negative { best - time } else { time - best } as u128;
+        return TimeFormat::for_diff().format_time(diff, negative);
     }
+    "".to_string()
 }
