@@ -1,4 +1,4 @@
-use andrew::{text::fontconfig, Canvas};
+use andrew::Canvas;
 use livesplit_core::{Segment, TimeSpan, TimerPhase};
 use smithay_client_toolkit::{
     default_environment,
@@ -20,7 +20,6 @@ use std::{
     cell::Cell,
     convert::TryInto,
     error::Error,
-    io::{Read, Split},
     rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
@@ -28,7 +27,7 @@ use std::{
 
 use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
 
-use crate::{time_format::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
+use crate::{config::Config, time_format::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 
 default_environment!(Env,
     fields = [
@@ -56,7 +55,7 @@ pub struct App<'a> {
 }
 
 impl App<'_> {
-    pub fn new(timer: WlSplitTimer) -> Self {
+    pub fn new(timer: WlSplitTimer, config: &Config) -> Self {
         let (env, display, queue) =
             new_default_environment!(Env, fields = [layer_shell: SimpleGlobal::new(),])
                 .expect("Initial roundtrip failed!");
@@ -65,8 +64,8 @@ impl App<'_> {
             .quick_insert(event_loop.handle())
             .unwrap();
 
-        let height = get_total_height(timer.segments().len(), 20, 5);
-        let surface = Surface::new(&env, None, (400, height as u32));
+        let height = get_total_height(timer.segments().len(), config.text_size, config.padding_v);
+        let surface = Surface::new(&env, None, (config.width as u32, height as u32), config);
         Self {
             timer: Arc::new(Mutex::new(timer)),
             surface,
@@ -151,6 +150,7 @@ impl Surface {
         env: &Environment<Env>,
         output: Option<&wl_output::WlOutput>,
         dimensions: (u32, u32),
+        config: &Config,
     ) -> Self {
         let pool = env
             .create_auto_pool()
@@ -165,10 +165,31 @@ impl Surface {
         );
 
         layer_surface.set_size(dimensions.0, dimensions.1);
-        layer_surface.set_margin(12, 0, 0, 12);
+        layer_surface.set_margin(
+            config.margin.0,
+            config.margin.1,
+            config.margin.2,
+            config.margin.3,
+        );
         // Anchor to the top left corner of the output
-        layer_surface
-            .set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Left);
+        let mut anchor = zwlr_layer_surface_v1::Anchor::all();
+        anchor.set(
+            zwlr_layer_surface_v1::Anchor::Top,
+            config.anchor.contains("top"),
+        );
+        anchor.set(
+            zwlr_layer_surface_v1::Anchor::Bottom,
+            config.anchor.contains("bottom"),
+        );
+        anchor.set(
+            zwlr_layer_surface_v1::Anchor::Left,
+            config.anchor.contains("left"),
+        );
+        anchor.set(
+            zwlr_layer_surface_v1::Anchor::Right,
+            config.anchor.contains("right"),
+        );
+        layer_surface.set_anchor(anchor);
 
         let next_render_event = Rc::new(Cell::new(None::<RenderEvent>));
         let next_render_event_handle = Rc::clone(&next_render_event);
@@ -195,9 +216,10 @@ impl Surface {
         // Commit so that the server will send a configure event
         surface.commit();
 
-        // TODO: remove hardcoded font name once config is done
-        let font_name = Some(String::from("source code pro"));
-        let family_name = font_name.map_or_else(|| FamilyName::Monospace, FamilyName::Title);
+        let family_name = config
+            .font_family
+            .clone()
+            .map_or_else(|| FamilyName::Monospace, FamilyName::Title);
         let font = SystemSource::new()
             .select_best_match(&[family_name], &Properties::new())
             .unwrap()
@@ -213,15 +235,20 @@ impl Surface {
             current_split: None,
             font_data,
             render_properties: RenderProperties {
-                text_height: 20,
-                padding_h: 5,
-                padding_v: 5,
-                background_color: [255, 0, 0, 0],
-                background_opacity: 128,
-                font_color: [255, 255, 255, 255],
-                font_color_gain: [255, 0, 255, 0],
-                font_color_loss: [255, 255, 0, 0],
-                font_color_gold: [255, 255, 255, 0],
+                text_height: config.text_size,
+                padding_h: config.padding_h,
+                padding_v: config.padding_v,
+                background_color: [
+                    255,
+                    config.background_color[0],
+                    config.background_color[1],
+                    config.background_color[2],
+                ],
+                background_opacity: config.background_opacity,
+                font_color: config.font_color,
+                font_color_gain: config.font_color_gain,
+                font_color_loss: config.font_color_loss,
+                font_color_gold: config.font_color_gold,
             },
         }
     }
@@ -435,7 +462,7 @@ impl Surface {
         current: bool,
         segment: &Segment,
         canvas: &mut Canvas,
-        font_data: &Vec<u8>,
+        font_data: &[u8],
         render_properties: &RenderProperties,
     ) -> Damage {
         let name = format!("> {}", segment.name().to_string());
@@ -481,7 +508,7 @@ impl Surface {
         segment: &Segment,
         current: bool,
         canvas: &mut Canvas,
-        font_data: &Vec<u8>,
+        font_data: &[u8],
         width: usize,
         timer: &WlSplitTimer,
         render_properties: &RenderProperties,
@@ -583,7 +610,7 @@ impl Surface {
 
     fn draw_attempts_counter(
         attempt_count: usize,
-        font_data: &Vec<u8>,
+        font_data: &[u8],
         render_properties: &RenderProperties,
         width: usize,
         canvas: &mut Canvas,
@@ -645,5 +672,5 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>) -> (String, SplitCo
 }
 
 fn get_total_height(len: usize, text_height: usize, padding_v: usize) -> usize {
-    (len + 2) * (text_height + padding_v) + (text_height as f32 * 1.2) as usize
+    (len + 3) * (text_height + padding_v)
 }

@@ -1,4 +1,5 @@
 use crate::{
+    config::Config,
     display::{Headless, TerminalApp, Wayland},
     wl_split_timer::RunMetadata,
 };
@@ -15,6 +16,7 @@ use std::{
     os::unix::net::{UnixListener, UnixStream},
 };
 use wl_split_timer::WlSplitTimer;
+mod config;
 mod display;
 mod file;
 mod time_format;
@@ -85,7 +87,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .default_value(&socket_path),
         )
         .get_matches();
-
+    let config: Config = confy::load("wlsplit")?;
+    println!("{:?}", config);
     let input = matches.value_of("file").expect("Input file required!");
 
     let create_file = matches.is_present("create_file")
@@ -111,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let display = matches.value_of("display").unwrap();
-    let app = get_app(display, timer);
+    let app = get_app(display, timer, &config);
 
     let app = Arc::new(Mutex::new(app));
     let timer = Arc::clone(app.lock().unwrap().timer());
@@ -165,11 +168,11 @@ fn handle_stream_response(timer: &Arc<Mutex<WlSplitTimer>>, stream: UnixStream) 
     false
 }
 
-fn get_app(display: &str, timer: WlSplitTimer) -> Box<dyn TimerDisplay> {
+fn get_app(display: &str, timer: WlSplitTimer, config: &Config) -> Box<dyn TimerDisplay> {
     match display {
         "terminal" => Box::new(TerminalApp::new(timer)),
         "null" => Box::new(Headless::new(timer)),
-        "wayland" => Box::new(Wayland::new(timer)),
+        "wayland" => Box::new(Wayland::new(timer, config)),
         _ => {
             panic!("Unknown method");
         }
