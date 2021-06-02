@@ -197,6 +197,28 @@ impl WlSplitTimer {
 
         Time::new().with_real_time(Some(time))
     }
+
+    pub fn get_segment_time(&self, index: usize) -> Option<usize> {
+        let current_time = self
+            .segments()
+            .get(index)
+            .and_then(|segment| segment.split_time().real_time);
+        if index == 0 {
+            return current_time.map(|time| time.to_duration().num_milliseconds() as usize);
+        }
+        let time = self
+            .segments()
+            .get(index - 1)
+            .and_then(|segment| segment.split_time().real_time);
+        if let (Some(current_time), Some(time)) = (current_time, time) {
+            Some(
+                (current_time.to_duration().num_milliseconds()
+                    - time.to_duration().num_milliseconds()) as usize,
+            )
+        } else {
+            None
+        }
+    }
 }
 
 fn read_file(file: &str, run: &mut Run) -> Result<(), Box<dyn Error>> {

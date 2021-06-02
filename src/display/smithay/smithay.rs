@@ -1,4 +1,5 @@
-use livesplit_core::TimerPhase;
+use andrew::{text::fontconfig, Canvas};
+use livesplit_core::{Segment, TimeSpan, TimerPhase};
 use smithay_client_toolkit::{
     default_environment,
     environment::{Environment, SimpleGlobal},
@@ -19,12 +20,15 @@ use std::{
     cell::Cell,
     convert::TryInto,
     error::Error,
+    io::{Read, Split},
     rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use crate::{wl_split_timer::WlSplitTimer, TimerDisplay};
+use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
+
+use crate::{time_format::TimeFormat, wl_split_timer::WlSplitTimer, TimerDisplay};
 
 default_environment!(Env,
     fields = [
@@ -34,6 +38,15 @@ default_environment!(Env,
         zwlr_layer_shell_v1::ZwlrLayerShellV1 => layer_shell
     ],
 );
+
+type Damage = [usize; 4];
+
+#[derive(Debug)]
+pub enum SplitColor {
+    Gain,
+    Loss,
+    Gold,
+}
 
 pub struct App<'a> {
     timer: Arc<Mutex<WlSplitTimer>>,
@@ -51,8 +64,9 @@ impl App<'_> {
         WaylandSource::new(queue)
             .quick_insert(event_loop.handle())
             .unwrap();
-        let height: u32 = (timer.segments().len() * 50).try_into().unwrap();
-        let surface = Surface::new(&env, None, (400, height));
+
+        let height = get_total_height(timer.segments().len(), 20, 5);
+        let surface = Surface::new(&env, None, (400, height as u32));
         Self {
             timer: Arc::new(Mutex::new(timer)),
             surface,
@@ -76,14 +90,17 @@ impl TimerDisplay for App<'_> {
                 Event::Redraw => redraw = true,
                 Event::Idle => {}
             }
-            if redraw || self.timer().lock().unwrap().timer().current_phase() == TimerPhase::Running
-            {
+
+            let timer_running =
+                self.timer().lock().unwrap().timer().current_phase() == TimerPhase::Running;
+            if redraw || timer_running {
                 self.surface.draw(&self.timer);
             }
             self.display.flush().unwrap();
             self.event_loop
                 .dispatch(Duration::from_millis(33), &mut ())
                 .unwrap();
+            std::thread::sleep(Duration::from_millis(33));
         }
         Ok(true)
     }
@@ -99,6 +116,19 @@ enum RenderEvent {
     Closed,
 }
 
+#[derive(Debug, Copy, Clone)]
+struct RenderProperties {
+    text_height: usize,
+    padding_h: usize,
+    padding_v: usize,
+    background_color: [u8; 4],
+    background_opacity: u8,
+    font_color: [u8; 4],
+    font_color_gain: [u8; 4],
+    font_color_loss: [u8; 4],
+    font_color_gold: [u8; 4],
+}
+
 enum Event {
     Close,
     Redraw,
@@ -111,6 +141,9 @@ struct Surface {
     next_render_event: Rc<Cell<Option<RenderEvent>>>,
     pool: AutoMemPool,
     dimensions: (u32, u32),
+    current_split: Option<usize>,
+    font_data: Vec<u8>,
+    render_properties: RenderProperties,
 }
 
 impl Surface {
@@ -162,12 +195,34 @@ impl Surface {
         // Commit so that the server will send a configure event
         surface.commit();
 
+        // TODO: remove hardcoded font name once config is done
+        let font_name = Some(String::from("source code pro"));
+        let family_name = font_name.map_or_else(|| FamilyName::Monospace, FamilyName::Title);
+        let font = SystemSource::new()
+            .select_best_match(&[family_name], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap();
+        let font_data = font.copy_font_data().unwrap().to_vec();
         Self {
             surface,
             layer_surface,
             next_render_event,
             pool,
             dimensions: (0, 0),
+            current_split: None,
+            font_data,
+            render_properties: RenderProperties {
+                text_height: 20,
+                padding_h: 5,
+                padding_v: 5,
+                background_color: [255, 0, 0, 0],
+                background_opacity: 128,
+                font_color: [255, 255, 255, 255],
+                font_color_gain: [255, 0, 255, 0],
+                font_color_loss: [255, 255, 0, 0],
+                font_color_gold: [255, 255, 255, 0],
+            },
         }
     }
 
@@ -187,7 +242,7 @@ impl Surface {
         let width = self.dimensions.0 as i32;
         let height = self.dimensions.1 as i32;
 
-        let (canvas, buffer) = if let Ok((canvas, buffer)) =
+        let (pixels, buffer) = if let Ok((canvas, buffer)) =
             self.pool
                 .buffer(width, height, stride, wl_shm::Format::Argb8888)
         {
@@ -197,24 +252,370 @@ impl Surface {
         };
 
         let timer = timer.lock().unwrap();
-        for dst_pixel in canvas.chunks_exact_mut(4) {
-            let pixel = if timer.timer().current_phase() == TimerPhase::Running {
-                0x1100ff00u32.to_ne_bytes()
-            } else {
-                0x11ff0000u32.to_ne_bytes()
-            };
-            dst_pixel[0] = pixel[0];
-            dst_pixel[1] = pixel[1];
-            dst_pixel[2] = pixel[2];
-            dst_pixel[3] = pixel[3];
+        let mut canvas = andrew::Canvas::new(
+            pixels,
+            width as usize,
+            height as usize,
+            stride as usize,
+            andrew::Endian::native(),
+        );
+        let mut damage: Vec<Damage> = Vec::new();
+        match self.current_split {
+            Some(previous_split) => {
+                let current_split = if let Some(index) = timer.current_segment_index() {
+                    index
+                } else {
+                    self.current_split = None;
+                    return;
+                };
+                if previous_split != current_split {
+                    damage.push(Surface::draw_segment_title(
+                        previous_split,
+                        false,
+                        &timer.segments()[previous_split],
+                        &mut canvas,
+                        &self.font_data,
+                        &self.render_properties,
+                    ));
+                    damage.push(Surface::draw_segment_title(
+                        current_split,
+                        true,
+                        &timer.current_segment().unwrap(),
+                        &mut canvas,
+                        &self.font_data,
+                        &self.render_properties,
+                    ));
+                    damage.push(Surface::draw_segment_time(
+                        previous_split,
+                        &timer.segments()[previous_split],
+                        false,
+                        &mut canvas,
+                        &self.font_data,
+                        width as usize,
+                        &timer,
+                        &self.render_properties,
+                    ));
+                    damage.push(Surface::draw_attempts_counter(
+                        timer.run().attempt_count() as usize,
+                        &self.font_data,
+                        &self.render_properties,
+                        width as usize,
+                        &mut canvas,
+                    ));
+                }
+                damage.push(Surface::draw_segment_time(
+                    current_split,
+                    &timer.current_segment().unwrap(),
+                    true,
+                    &mut canvas,
+                    &self.font_data,
+                    width as usize,
+                    &timer,
+                    &self.render_properties,
+                ));
+            }
+            None => {
+                damage.push([0, 0, width as usize, height as usize]);
+                canvas.clear();
+                canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+                    (0, 0),
+                    (width as usize, height as usize),
+                    None,
+                    Some(self.render_properties.background_color),
+                ));
+                let title = format!("{} ({})", timer.game_name(), timer.category_name());
+                canvas.draw(&andrew::text::Text::new(
+                    (
+                        self.render_properties.padding_h,
+                        self.render_properties.padding_v,
+                    ),
+                    self.render_properties.font_color,
+                    &self.font_data,
+                    self.render_properties.text_height as f32,
+                    1.0,
+                    title,
+                ));
+
+                Surface::draw_attempts_counter(
+                    timer.run().attempt_count() as usize,
+                    &self.font_data,
+                    &self.render_properties,
+                    width as usize,
+                    &mut canvas,
+                );
+
+                for (i, segment) in timer.segments().iter().enumerate() {
+                    let current_segment = timer.current_segment_index().unwrap_or(0);
+                    self.current_split = Some(current_segment);
+                    Surface::draw_segment_title(
+                        i,
+                        i == current_segment,
+                        segment,
+                        &mut canvas,
+                        &self.font_data,
+                        &self.render_properties,
+                    );
+                    Surface::draw_segment_time(
+                        i,
+                        segment,
+                        i == current_segment,
+                        &mut canvas,
+                        &self.font_data,
+                        width as usize,
+                        &timer,
+                        &self.render_properties,
+                    );
+                }
+            }
         }
+        let mut current_time = andrew::text::Text::new(
+            (0, 0),
+            self.render_properties.font_color,
+            &self.font_data,
+            self.render_properties.text_height as f32 * 1.2,
+            1.0,
+            &timer.time().map_or_else(
+                || "/".to_string(),
+                |time| {
+                    TimeFormat::default()
+                        .format_time(time.to_duration().num_milliseconds() as u128, false)
+                },
+            ),
+        );
+        let pos = (
+            width as usize - current_time.get_width() - self.render_properties.padding_h,
+            2 * self.render_properties.padding_v
+                + ((timer.segments().len() + 1)
+                    * (self.render_properties.text_height + self.render_properties.padding_v)),
+        );
+
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            pos,
+            (
+                current_time.get_width() + self.render_properties.padding_h,
+                self.render_properties.text_height + self.render_properties.padding_v,
+            ),
+            None,
+            Some(self.render_properties.background_color),
+        ));
+        current_time.pos = pos;
+        canvas.draw(&current_time);
+        damage.push([
+            current_time.pos.0,
+            current_time.pos.1,
+            current_time.get_width() + self.render_properties.padding_h,
+            self.render_properties.text_height + self.render_properties.padding_v,
+        ]);
+        self.current_split = timer.current_segment_index();
         drop(timer);
 
+        // Ugly workaround for transparency
+        for dst_pixel in pixels.chunks_exact_mut(4) {
+            if dst_pixel[0] == self.render_properties.background_color[1]
+                && dst_pixel[1] == self.render_properties.background_color[2]
+                && dst_pixel[2] == self.render_properties.background_color[3]
+            {
+                dst_pixel[3] = self.render_properties.background_opacity;
+            }
+        }
         self.surface.attach(Some(&buffer), 0, 0);
-        self.surface
-            .damage_buffer(0, 0, width as i32, height as i32);
+        for damage in damage {
+            self.surface.damage_buffer(
+                damage[0] as i32,
+                damage[1] as i32,
+                damage[2] as i32,
+                damage[3] as i32,
+            );
+        }
 
         self.surface.commit();
+    }
+    fn draw_segment_title(
+        index: usize,
+        current: bool,
+        segment: &Segment,
+        canvas: &mut Canvas,
+        font_data: &Vec<u8>,
+        render_properties: &RenderProperties,
+    ) -> Damage {
+        let name = format!("> {}", segment.name().to_string());
+        let pos = (
+            render_properties.padding_h,
+            render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)),
+        );
+        let mut title = andrew::text::Text::new(
+            pos,
+            render_properties.font_color,
+            &font_data,
+            render_properties.text_height as f32,
+            1.0,
+            &name,
+        );
+        let damage: Damage = [
+            title.pos.0,
+            title.pos.1,
+            title.get_width() + render_properties.padding_h,
+            render_properties.text_height + render_properties.padding_v,
+        ];
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            title.pos,
+            (
+                title.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+
+        if !current {
+            title.text = String::from(name.strip_prefix("> ").unwrap());
+        }
+
+        canvas.draw(&title);
+        damage
+    }
+
+    fn draw_segment_time(
+        index: usize,
+        segment: &Segment,
+        current: bool,
+        canvas: &mut Canvas,
+        font_data: &Vec<u8>,
+        width: usize,
+        timer: &WlSplitTimer,
+        render_properties: &RenderProperties,
+    ) -> Damage {
+        let timestamp = if let Some(time) = segment.personal_best_split_time().real_time {
+            Some(time)
+        } else if segment.segment_history().iter().len() == 0 {
+            segment.split_time().real_time
+        } else {
+            None
+        };
+        let mut time = andrew::text::Text::new(
+            (0, 0),
+            render_properties.font_color,
+            &font_data,
+            render_properties.text_height as f32,
+            1.0,
+            &timestamp.map_or_else(
+                || "/".to_string(),
+                |time| {
+                    TimeFormat::default()
+                        .format_time(time.to_duration().num_milliseconds() as u128, false)
+                },
+            ),
+        );
+        time.pos = (
+            width as usize - time.get_width() - render_properties.padding_h,
+            render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)),
+        );
+
+        let diff_timestamp = {
+            let mut diff = diff_time(
+                if current {
+                    timer.time()
+                } else {
+                    segment.split_time().real_time
+                },
+                timer.segments()[index].personal_best_split_time().real_time,
+            );
+            let gold = if let (Some(split), Some(pb)) = (
+                timer.get_segment_time(index),
+                timer.segments()[index].best_segment_time().real_time,
+            ) {
+                split < pb.to_duration().num_milliseconds().try_into().unwrap()
+            } else {
+                false
+            };
+            if !current && gold {
+                diff.1 = SplitColor::Gold;
+            }
+            diff
+        };
+        let mut diff = andrew::text::Text::new(
+            (0, 0),
+            match diff_timestamp.1 {
+                SplitColor::Gain => render_properties.font_color_gain,
+                SplitColor::Loss => render_properties.font_color_loss,
+                SplitColor::Gold => render_properties.font_color_gold,
+            },
+            &font_data,
+            render_properties.text_height as f32 * 0.9,
+            1.0,
+            &diff_timestamp.0,
+        );
+        diff.pos = (
+            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
+            render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
+                + (render_properties.text_height / 20),
+        );
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            time.pos,
+            (
+                time.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            diff.pos,
+            (
+                diff.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+        canvas.draw(&time);
+        canvas.draw(&diff);
+        [
+            diff.pos.0,
+            diff.pos.1,
+            diff.get_width() + time.get_width() + 6 * render_properties.padding_h,
+            render_properties.text_height + render_properties.padding_v,
+        ]
+    }
+
+    fn draw_attempts_counter(
+        attempt_count: usize,
+        font_data: &Vec<u8>,
+        render_properties: &RenderProperties,
+        width: usize,
+        canvas: &mut Canvas,
+    ) -> Damage {
+        let mut attempts = andrew::text::Text::new(
+            (0, 0),
+            render_properties.font_color,
+            &font_data,
+            render_properties.text_height as f32,
+            1.0,
+            attempt_count.to_string(),
+        );
+        attempts.pos = (
+            width as usize - attempts.get_width() - render_properties.padding_h,
+            render_properties.padding_v,
+        );
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            attempts.pos,
+            (
+                attempts.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+        canvas.draw(&attempts);
+        [
+            attempts.pos.0,
+            attempts.pos.1,
+            attempts.get_width() + render_properties.padding_h,
+            render_properties.text_height + render_properties.padding_v,
+        ]
     }
 }
 
@@ -223,4 +624,26 @@ impl Drop for Surface {
         self.layer_surface.destroy();
         self.surface.destroy();
     }
+}
+
+fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>) -> (String, SplitColor) {
+    if let (Some(time), Some(best)) = (time, best) {
+        let time = time.to_duration().num_milliseconds();
+        let best = best.to_duration().num_milliseconds();
+        let negative = best > time;
+        let diff = if negative { best - time } else { time - best } as u128;
+        return (
+            TimeFormat::for_diff().format_time(diff, negative),
+            if negative {
+                SplitColor::Gain
+            } else {
+                SplitColor::Loss
+            },
+        );
+    }
+    ("".to_string(), SplitColor::Loss)
+}
+
+fn get_total_height(len: usize, text_height: usize, padding_v: usize) -> usize {
+    (len + 2) * (text_height + padding_v) + (text_height as f32 * 1.2) as usize
 }
