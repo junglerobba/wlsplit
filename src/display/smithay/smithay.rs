@@ -77,6 +77,7 @@ impl App<'_> {
 
 impl TimerDisplay for App<'_> {
     fn run(&mut self) -> Result<bool, Box<dyn Error>> {
+        let mut extra_frame = false;
         loop {
             let timer = self.timer.lock().unwrap();
             if timer.exit {
@@ -92,9 +93,10 @@ impl TimerDisplay for App<'_> {
 
             let timer_running =
                 self.timer().lock().unwrap().timer().current_phase() == TimerPhase::Running;
-            if redraw || timer_running {
+            if redraw || timer_running || extra_frame {
                 self.surface.draw(&self.timer);
             }
+            extra_frame = timer_running;
             self.display.flush().unwrap();
             self.event_loop
                 .dispatch(Duration::from_millis(33), &mut ())
