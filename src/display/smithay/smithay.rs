@@ -574,13 +574,7 @@ impl Surface {
             &font_data,
             render_properties.text_height as f32 * 0.9,
             1.0,
-            &diff_timestamp.0,
-        );
-        diff.pos = (
-            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
-            render_properties.padding_v
-                + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
-                + (render_properties.text_height / 20),
+            "-:--:--.---",
         );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             time.pos,
@@ -591,8 +585,14 @@ impl Surface {
             None,
             Some(render_properties.background_color),
         ));
+        let diff_damage_pos = (
+            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
+            render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
+                + (render_properties.text_height / 20),
+        );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
-            diff.pos,
+            diff_damage_pos,
             (
                 diff.get_width() + render_properties.padding_h,
                 render_properties.text_height + render_properties.padding_v,
@@ -600,14 +600,23 @@ impl Surface {
             None,
             Some(render_properties.background_color),
         ));
-        canvas.draw(&time);
-        canvas.draw(&diff);
-        [
-            diff.pos.0,
-            diff.pos.1,
+        let damage: Damage = [
+            diff_damage_pos.0,
+            diff_damage_pos.1,
             diff.get_width() + time.get_width() + 6 * render_properties.padding_h,
             render_properties.text_height + render_properties.padding_v,
-        ]
+        ];
+        diff.text = diff_timestamp.0;
+        diff.pos = (
+            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
+            render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
+                + (render_properties.text_height / 20),
+        );
+        canvas.draw(&time);
+        canvas.draw(&diff);
+
+        damage
     }
 
     fn draw_attempts_counter(
