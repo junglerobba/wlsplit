@@ -395,6 +395,17 @@ impl Surface {
                         &self.render_properties,
                     );
                 }
+
+                Surface::draw_additional_info(
+                    &mut canvas,
+                    timer.segments().len() + 2,
+                    &self.render_properties,
+                    &self.font_data,
+                    width as usize,
+                    "Sum of best segments",
+                    &TimeFormat::default()
+                        .format_time(timer.best_possible_time().try_into().unwrap(), false),
+                );
             }
         }
         let mut current_time = andrew::text::Text::new(
@@ -655,6 +666,68 @@ impl Surface {
             render_properties.text_height + render_properties.padding_v,
         ]
     }
+
+    fn draw_additional_info(
+        canvas: &mut Canvas,
+        offset: usize,
+        render_properties: &RenderProperties,
+        font_data: &[u8],
+        width: usize,
+        text_left: &str,
+        text_right: &str,
+    ) -> Damage {
+        let text_left = andrew::text::Text::new(
+            (
+                render_properties.padding_h,
+                2 * render_properties.padding_v
+                    + ((offset) * (render_properties.text_height + render_properties.padding_v)),
+            ),
+            render_properties.font_color,
+            &font_data,
+            render_properties.text_height as f32,
+            1.0,
+            text_left,
+        );
+        let mut text_right = andrew::text::Text::new(
+            (0, 0),
+            render_properties.font_color,
+            &font_data,
+            render_properties.text_height as f32,
+            1.0,
+            text_right,
+        );
+        text_right.pos = (
+            width as usize - text_right.get_width() - render_properties.padding_h,
+            2 * render_properties.padding_v
+                + ((offset) * (render_properties.text_height + render_properties.padding_v)),
+        );
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            text_left.pos,
+            (
+                text_left.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+        canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
+            text_right.pos,
+            (
+                text_right.get_width() + render_properties.padding_h,
+                render_properties.text_height + render_properties.padding_v,
+            ),
+            None,
+            Some(render_properties.background_color),
+        ));
+        canvas.draw(&text_left);
+        canvas.draw(&text_right);
+        [
+            text_left.pos.0,
+            text_right.pos.1,
+            width as usize,
+            render_properties.text_height + render_properties.padding_v,
+        ]
+    }
 }
 
 impl Drop for Surface {
@@ -683,5 +756,5 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>) -> (String, SplitCo
 }
 
 fn get_total_height(len: usize, text_height: usize, padding_v: usize) -> usize {
-    (len + 3) * (text_height + padding_v)
+    (len + 4) * (text_height + padding_v)
 }
