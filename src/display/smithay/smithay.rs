@@ -142,6 +142,8 @@ struct Surface {
     next_render_event: Rc<Cell<Option<RenderEvent>>>,
     pool: AutoMemPool,
     dimensions: (u32, u32),
+    current_scale: i32,
+    scale_handle: Rc<Cell<i32>>,
     current_split: Option<usize>,
     font_data: Vec<u8>,
     render_properties: RenderProperties,
@@ -158,7 +160,13 @@ impl Surface {
             .create_auto_pool()
             .expect("Failed to create memory pool");
         let layer_shell = env.require_global::<zwlr_layer_shell_v1::ZwlrLayerShellV1>();
-        let surface = env.create_surface().detach();
+        let scale = Rc::new(Cell::new(1));
+        let scale_handle = Rc::clone(&scale);
+        let surface = env
+            .create_surface_with_scale_callback(move |dpi, _, _| {
+                scale.set(dpi);
+            })
+            .detach();
         let layer_surface = layer_shell.get_layer_surface(
             &surface,
             output,
@@ -234,6 +242,8 @@ impl Surface {
             next_render_event,
             pool,
             dimensions: (0, 0),
+            current_scale: 1,
+            scale_handle,
             current_split: None,
             font_data,
             render_properties: RenderProperties {
@@ -267,10 +277,19 @@ impl Surface {
     }
 
     fn draw(&mut self, timer: &Arc<Mutex<WlSplitTimer>>) {
-        let stride = 4 * self.dimensions.0 as i32;
-        let width = self.dimensions.0 as i32;
-        let height = self.dimensions.1 as i32;
+        let scale = self.scale_handle.get();
+        if self.current_scale != scale {
+            self.current_scale = scale;
+            self.surface.set_buffer_scale(scale);
+            println!("Scale set to {}", scale);
+            // Force full redraw
+            self.current_split = None;
+        }
+        let stride = 4 * self.dimensions.0 as i32 * scale;
+        let width = self.dimensions.0 as i32 * scale;
+        let height = self.dimensions.1 as i32 * scale;
 
+        let scale = scale as usize;
         let (pixels, buffer) = if let Ok((canvas, buffer)) =
             self.pool
                 .buffer(width, height, stride, wl_shm::Format::Argb8888)
@@ -305,6 +324,7 @@ impl Surface {
                         &mut canvas,
                         &self.font_data,
                         &self.render_properties,
+                        scale,
                     ));
                     damage.push(Surface::draw_segment_title(
                         current_split,
@@ -313,6 +333,7 @@ impl Surface {
                         &mut canvas,
                         &self.font_data,
                         &self.render_properties,
+                        scale,
                     ));
                     damage.push(Surface::draw_segment_time(
                         previous_split,
@@ -323,6 +344,7 @@ impl Surface {
                         width as usize,
                         &timer,
                         &self.render_properties,
+                        scale,
                     ));
                     damage.push(Surface::draw_attempts_counter(
                         timer.run().attempt_count() as usize,
@@ -330,6 +352,7 @@ impl Surface {
                         &self.render_properties,
                         width as usize,
                         &mut canvas,
+                        scale,
                     ));
                 }
                 damage.push(Surface::draw_segment_time(
@@ -341,6 +364,7 @@ impl Surface {
                     width as usize,
                     &timer,
                     &self.render_properties,
+                    scale,
                 ));
             }
             None => {
@@ -355,12 +379,12 @@ impl Surface {
                 let title = format!("{} ({})", timer.game_name(), timer.category_name());
                 canvas.draw(&andrew::text::Text::new(
                     (
-                        self.render_properties.padding_h,
-                        self.render_properties.padding_v,
+                        self.render_properties.padding_h * scale,
+                        self.render_properties.padding_v * scale,
                     ),
                     self.render_properties.font_color,
                     &self.font_data,
-                    self.render_properties.text_height as f32,
+                    (self.render_properties.text_height * scale) as f32,
                     1.0,
                     title,
                 ));
@@ -371,6 +395,7 @@ impl Surface {
                     &self.render_properties,
                     width as usize,
                     &mut canvas,
+                    scale,
                 );
 
                 for (i, segment) in timer.segments().iter().enumerate() {
@@ -383,6 +408,7 @@ impl Surface {
                         &mut canvas,
                         &self.font_data,
                         &self.render_properties,
+                        scale,
                     );
                     Surface::draw_segment_time(
                         i,
@@ -393,6 +419,7 @@ impl Surface {
                         width as usize,
                         &timer,
                         &self.render_properties,
+                        scale,
                     );
                 }
 
@@ -405,6 +432,7 @@ impl Surface {
                     "Sum of best segments",
                     &TimeFormat::default()
                         .format_time(timer.best_possible_time().try_into().unwrap(), false),
+                    scale,
                 );
             }
         }
@@ -412,7 +440,7 @@ impl Surface {
             (0, 0),
             self.render_properties.font_color,
             &self.font_data,
-            self.render_properties.text_height as f32 * 1.2,
+            (self.render_properties.text_height * scale) as f32 * 1.2,
             1.0,
             &timer.time().map_or_else(
                 || "/".to_string(),
@@ -423,17 +451,18 @@ impl Surface {
             ),
         );
         let pos = (
-            width as usize - current_time.get_width() - self.render_properties.padding_h,
-            2 * self.render_properties.padding_v
+            width as usize - current_time.get_width() - self.render_properties.padding_h * scale,
+            (2 * self.render_properties.padding_v
                 + ((timer.segments().len() + 1)
-                    * (self.render_properties.text_height + self.render_properties.padding_v)),
+                    * (self.render_properties.text_height + self.render_properties.padding_v)))
+                * scale,
         );
 
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             pos,
             (
                 current_time.get_width() + self.render_properties.padding_h,
-                self.render_properties.text_height + self.render_properties.padding_v,
+                (self.render_properties.text_height + self.render_properties.padding_v) * scale,
             ),
             None,
             Some(self.render_properties.background_color),
@@ -444,7 +473,7 @@ impl Surface {
             current_time.pos.0,
             current_time.pos.1,
             current_time.get_width() + self.render_properties.padding_h,
-            self.render_properties.text_height + self.render_properties.padding_v,
+            (self.render_properties.text_height + self.render_properties.padding_v) * scale,
         ]);
         self.current_split = timer.current_segment_index();
         drop(timer);
@@ -477,32 +506,34 @@ impl Surface {
         canvas: &mut Canvas,
         font_data: &[u8],
         render_properties: &RenderProperties,
+        scale: usize,
     ) -> Damage {
         let name = format!("> {}", segment.name().to_string());
         let pos = (
-            render_properties.padding_h,
-            render_properties.padding_v
-                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)),
+            render_properties.padding_h * scale,
+            (render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)))
+                * scale,
         );
         let mut title = andrew::text::Text::new(
             pos,
             render_properties.font_color,
             &font_data,
-            render_properties.text_height as f32,
+            (render_properties.text_height * scale) as f32,
             1.0,
             &name,
         );
         let damage: Damage = [
             title.pos.0,
             title.pos.1,
-            title.get_width() + render_properties.padding_h,
-            render_properties.text_height + render_properties.padding_v,
+            (title.get_width() + render_properties.padding_h) * scale,
+            (render_properties.text_height + render_properties.padding_v) * scale,
         ];
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             title.pos,
             (
-                title.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                (title.get_width() + render_properties.padding_h) * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
@@ -525,6 +556,7 @@ impl Surface {
         width: usize,
         timer: &WlSplitTimer,
         render_properties: &RenderProperties,
+        scale: usize,
     ) -> Damage {
         let timestamp = if let Some(time) = segment.personal_best_split_time().real_time {
             Some(time)
@@ -537,7 +569,7 @@ impl Surface {
             (0, 0),
             render_properties.font_color,
             &font_data,
-            render_properties.text_height as f32,
+            (render_properties.text_height * scale) as f32,
             1.0,
             &timestamp.map_or_else(
                 || "/".to_string(),
@@ -548,9 +580,10 @@ impl Surface {
             ),
         );
         time.pos = (
-            width as usize - time.get_width() - render_properties.padding_h,
-            render_properties.padding_v
-                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)),
+            width as usize - time.get_width() - render_properties.padding_h * scale,
+            (render_properties.padding_v
+                + ((index + 1) * (render_properties.text_height + render_properties.padding_v)))
+                * scale,
         );
 
         let diff_timestamp = {
@@ -583,30 +616,34 @@ impl Surface {
                 SplitColor::Gold => render_properties.font_color_gold,
             },
             &font_data,
-            render_properties.text_height as f32 * 0.9,
+            (render_properties.text_height * scale) as f32 * 0.9,
             1.0,
             "-:--:--.---",
         );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             time.pos,
             (
-                time.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                (time.get_width() + render_properties.padding_h) * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
         ));
         let diff_damage_pos = (
-            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
-            render_properties.padding_v
+            width as usize
+                - time.get_width()
+                - diff.get_width()
+                - render_properties.padding_h * 4 * scale,
+            (render_properties.padding_v
                 + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
-                + (render_properties.text_height / 20),
+                + (render_properties.text_height / 20))
+                * scale,
         );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             diff_damage_pos,
             (
-                diff.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                (diff.get_width() + render_properties.padding_h) * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
@@ -614,15 +651,19 @@ impl Surface {
         let damage: Damage = [
             diff_damage_pos.0,
             diff_damage_pos.1,
-            diff.get_width() + time.get_width() + 6 * render_properties.padding_h,
-            render_properties.text_height + render_properties.padding_v,
+            diff.get_width() + time.get_width() + 6 * render_properties.padding_h * scale,
+            (render_properties.text_height + render_properties.padding_v) * scale,
         ];
         diff.text = diff_timestamp.0;
         diff.pos = (
-            width as usize - time.get_width() - diff.get_width() - render_properties.padding_h * 4,
-            render_properties.padding_v
+            width as usize
+                - time.get_width()
+                - diff.get_width()
+                - render_properties.padding_h * 4 * scale,
+            (render_properties.padding_v
                 + ((index + 1) * (render_properties.text_height + render_properties.padding_v))
-                + (render_properties.text_height / 20),
+                + (render_properties.text_height / 20))
+                * scale,
         );
         canvas.draw(&time);
         canvas.draw(&diff);
@@ -636,24 +677,25 @@ impl Surface {
         render_properties: &RenderProperties,
         width: usize,
         canvas: &mut Canvas,
+        scale: usize,
     ) -> Damage {
         let mut attempts = andrew::text::Text::new(
             (0, 0),
             render_properties.font_color,
             &font_data,
-            render_properties.text_height as f32,
+            (render_properties.text_height * scale) as f32,
             1.0,
             attempt_count.to_string(),
         );
         attempts.pos = (
-            width as usize - attempts.get_width() - render_properties.padding_h,
-            render_properties.padding_v,
+            (width as usize - attempts.get_width() - render_properties.padding_h) * scale,
+            render_properties.padding_v * scale,
         );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             attempts.pos,
             (
-                attempts.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                (attempts.get_width() + render_properties.padding_h) * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
@@ -675,16 +717,18 @@ impl Surface {
         width: usize,
         text_left: &str,
         text_right: &str,
+        scale: usize,
     ) -> Damage {
         let text_left = andrew::text::Text::new(
             (
-                render_properties.padding_h,
-                2 * render_properties.padding_v
-                    + ((offset) * (render_properties.text_height + render_properties.padding_v)),
+                render_properties.padding_h * scale,
+                (2 * render_properties.padding_v
+                    + ((offset) * (render_properties.text_height + render_properties.padding_v)))
+                    * scale,
             ),
             render_properties.font_color,
             &font_data,
-            render_properties.text_height as f32,
+            (render_properties.text_height * scale) as f32,
             1.0,
             text_left,
         );
@@ -692,20 +736,21 @@ impl Surface {
             (0, 0),
             render_properties.font_color,
             &font_data,
-            render_properties.text_height as f32,
+            (render_properties.text_height * scale) as f32,
             1.0,
             text_right,
         );
         text_right.pos = (
-            width as usize - text_right.get_width() - render_properties.padding_h,
-            2 * render_properties.padding_v
-                + ((offset) * (render_properties.text_height + render_properties.padding_v)),
+            width as usize - text_right.get_width() - render_properties.padding_h * scale,
+            (2 * render_properties.padding_v
+                + ((offset) * (render_properties.text_height + render_properties.padding_v)))
+                * scale,
         );
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             text_left.pos,
             (
-                text_left.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                text_left.get_width() + render_properties.padding_h * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
@@ -713,8 +758,8 @@ impl Surface {
         canvas.draw(&andrew::shapes::rectangle::Rectangle::new(
             text_right.pos,
             (
-                text_right.get_width() + render_properties.padding_h,
-                render_properties.text_height + render_properties.padding_v,
+                text_right.get_width() + render_properties.padding_h * scale,
+                (render_properties.text_height + render_properties.padding_v) * scale,
             ),
             None,
             Some(render_properties.background_color),
@@ -725,7 +770,7 @@ impl Surface {
             text_left.pos.0,
             text_right.pos.1,
             width as usize,
-            render_properties.text_height + render_properties.padding_v,
+            (render_properties.text_height + render_properties.padding_v) * scale,
         ]
     }
 }
