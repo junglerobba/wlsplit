@@ -125,7 +125,7 @@ impl WlSplitTimer {
         self.timer.current_split_index()
     }
 
-    pub fn segment_time(&self, index: usize) -> Time {
+    pub fn segment_split_time(&self, index: usize) -> Time {
         self.timer.run().segment(index).split_time()
     }
 
@@ -218,6 +218,23 @@ impl WlSplitTimer {
         } else {
             None
         }
+    }
+
+    pub fn get_personal_best_index(&self) -> Option<i32> {
+        let history = self.run().attempt_history().to_vec();
+        history
+            .iter()
+            .min_by(|a, b| a.time().real_time.cmp(&b.time().real_time))
+            .map(|attempt| attempt.index())
+    }
+
+    pub fn get_personal_best_segment_time(&self, index: usize) -> Option<Time> {
+        self.get_personal_best_index().and_then(|pb_index| {
+            self.run()
+                .segments()
+                .get(index)
+                .and_then(|segment| segment.segment_history().get(pb_index))
+        })
     }
 }
 

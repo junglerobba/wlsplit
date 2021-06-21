@@ -354,6 +354,28 @@ impl Surface {
                         &mut canvas,
                         scale,
                     ));
+                    let best_segment = timer.get_personal_best_segment_time(previous_split);
+                    let current_segment = timer.get_segment_time(previous_split);
+                    let diff = diff_time(
+                        current_segment.map(|msecs| TimeSpan::from_milliseconds(msecs as f64)),
+                        best_segment.and_then(|segment| segment.real_time),
+                    );
+                    let mut previous_segment_render_properties = self.render_properties.clone();
+                    previous_segment_render_properties.font_color = match diff.1 {
+                        SplitColor::Gain => self.render_properties.font_color_gain,
+                        SplitColor::Loss => self.render_properties.font_color_loss,
+                        SplitColor::Gold => self.render_properties.font_color_gold,
+                    };
+                    damage.push(Surface::draw_additional_info(
+                        &mut canvas,
+                        timer.segments().len() + 3,
+                        &previous_segment_render_properties,
+                        &self.font_data,
+                        width as usize,
+                        "Previous segment",
+                        &diff.0,
+                        scale,
+                    ))
                 }
                 damage.push(Surface::draw_segment_time(
                     current_split,
@@ -801,5 +823,5 @@ fn diff_time(time: Option<TimeSpan>, best: Option<TimeSpan>) -> (String, SplitCo
 }
 
 fn get_total_height(len: usize, text_height: usize, padding_v: usize) -> usize {
-    (len + 4) * (text_height + padding_v)
+    (len + 5) * (text_height + padding_v)
 }
