@@ -27,6 +27,15 @@ Available commands are:
 
 I would recommend binding these commands as hotkeys in your compositor so that they can be used while a game is in focus.
 
+# Installation
+
+## Requirements
+
+ - `freetype-devel`
+ - `fontconfig-devel`
+
+For installation into `~/.cargo/bin` simply clone the repo and run: `cargo install --path .`
+
 # Configuration
 
 A configuration file with the defaults is automatically created in `.config/wlsplit/wlsplit.toml`.
