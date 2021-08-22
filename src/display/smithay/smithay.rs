@@ -22,7 +22,7 @@ use std::{
     error::Error,
     rc::Rc,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
@@ -52,6 +52,7 @@ pub struct App<'a> {
     surface: Surface,
     display: Display,
     event_loop: EventLoop<'a, ()>,
+    sleep: u16,
 }
 
 impl App<'_> {
@@ -71,6 +72,7 @@ impl App<'_> {
             surface,
             display,
             event_loop,
+            sleep: 1000 / config.target_framerate,
         }
     }
 }
@@ -79,6 +81,7 @@ impl TimerDisplay for App<'_> {
     fn run(&mut self) -> Result<bool, Box<dyn Error>> {
         let mut extra_frame = false;
         loop {
+            let duration = Instant::now();
             let timer = self.timer.lock().unwrap();
             if timer.exit {
                 break;
@@ -98,10 +101,19 @@ impl TimerDisplay for App<'_> {
             }
             extra_frame = timer_running;
             self.display.flush().unwrap();
-            self.event_loop
-                .dispatch(Duration::from_millis(33), &mut ())
-                .unwrap();
-            std::thread::sleep(Duration::from_millis(33));
+            let duration: u16 = duration
+                .elapsed()
+                .as_millis()
+                .try_into()
+                .unwrap_or_default();
+
+            let sleep = if duration > self.sleep {
+                Duration::from_millis(0)
+            } else {
+                Duration::from_millis((self.sleep - duration).into())
+            };
+            self.event_loop.dispatch(sleep, &mut ()).unwrap();
+            std::thread::sleep(sleep);
         }
         Ok(true)
     }

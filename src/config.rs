@@ -15,6 +15,7 @@ pub struct Config {
     pub font_color_loss: [u8; 4],
     pub font_color_gold: [u8; 4],
     pub font_family: Option<String>,
+    pub target_framerate: u16,
 }
 
 impl Default for Config {
@@ -33,6 +34,7 @@ impl Default for Config {
             font_color_loss: [255, 255, 0, 0],
             font_color_gold: [255, 255, 255, 0],
             font_family: None,
+            target_framerate: 30,
         }
     }
 }
